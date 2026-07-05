@@ -6,8 +6,17 @@
 // ============================================================
 
 export default async function handler(req, res) {
-    // 1. Only allow POST requests
+    // 1. Handle CORS preflight (OPTIONS) requests
+    if (req.method === 'OPTIONS') {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        return res.status(200).end();
+    }
+
+    // 2. Only allow POST requests
     if (req.method !== 'POST') {
+        res.setHeader('Allow', 'POST');
         return res.status(405).json({ 
             success: false, 
             error: 'Method not allowed. Please use POST.' 
@@ -15,10 +24,10 @@ export default async function handler(req, res) {
     }
 
     try {
-        // 2. Get data from request
+        // 3. Get data from request
         const { email, code, action = 'verification' } = req.body;
         
-        // 3. Validate input
+        // 4. Validate input
         if (!email || !code) {
             return res.status(400).json({ 
                 success: false, 
@@ -34,7 +43,7 @@ export default async function handler(req, res) {
             });
         }
 
-        // 4. Get Resend API key from environment variables (SECURE)
+        // 5. Get Resend API key from environment variables (SECURE)
         const RESEND_API_KEY = process.env.RESEND_API_KEY;
         
         if (!RESEND_API_KEY) {
@@ -45,7 +54,7 @@ export default async function handler(req, res) {
             });
         }
 
-        // 5. Build email subject based on action
+        // 6. Build email subject based on action
         const subjectMap = {
             signup: 'Verify Your Email - FreeTranslate',
             signin: 'Your Sign In Code - FreeTranslate',
@@ -57,7 +66,7 @@ export default async function handler(req, res) {
         
         const subject = subjectMap[action] || 'Your Verification Code - FreeTranslate';
         
-        // 6. Build email HTML content
+        // 7. Build email HTML content
         const htmlContent = `
             <!DOCTYPE html>
             <html>
@@ -95,7 +104,7 @@ export default async function handler(req, res) {
             </html>
         `;
 
-        // 7. Prepare Resend API payload
+        // 8. Prepare Resend API payload
         const resendPayload = {
             from: 'FreeTranslate <mutuyimanaornella00@gmail.com>',
             to: email,
@@ -103,7 +112,7 @@ export default async function handler(req, res) {
             html: htmlContent
         };
 
-        // 8. Send email via Resend API
+        // 9. Send email via Resend API
         const response = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
