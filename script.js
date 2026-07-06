@@ -193,7 +193,6 @@ async function verifyCode(email, code) {
 // CUSTOM MODALS
 // ============================================================
 
-// Custom prompt modal for password confirmation
 function showPasswordConfirmModal(title, message, inputPlaceholder = 'Enter your password', inputType = 'password') {
     return new Promise((resolve) => {
         const modal = document.createElement('div');
@@ -255,7 +254,6 @@ function showPasswordConfirmModal(title, message, inputPlaceholder = 'Enter your
     });
 }
 
-// Custom password reset modal
 function showPasswordResetModal() {
     return new Promise((resolve) => {
         const modal = document.createElement('div');
@@ -755,11 +753,23 @@ function openAccountSettings() {
                 return;
             }
             
+            // Change button to sending state
+            const saveBtn = document.getElementById('saveSettingsBtn');
+            const originalText = saveBtn.textContent;
+            saveBtn.textContent = 'Sending code...';
+            saveBtn.disabled = true;
+            
             const result = await sendVerificationCode(newEmail, 'email');
+            
             if (!result.success) {
                 showNotification('Error sending verification code.', 'error');
+                saveBtn.textContent = originalText;
+                saveBtn.disabled = false;
                 return;
             }
+            
+            saveBtn.textContent = originalText;
+            saveBtn.disabled = false;
             
             openVerificationModal(newEmail, 'email', async (token) => {
                 const updateResult = DATA_MANAGER.updateProfile(user.id, { 
@@ -797,11 +807,23 @@ function openAccountSettings() {
                 return;
             }
             
+            // Change button to sending state
+            const saveBtn = document.getElementById('saveSettingsBtn');
+            const originalText = saveBtn.textContent;
+            saveBtn.textContent = 'Sending code...';
+            saveBtn.disabled = true;
+            
             const result = await sendVerificationCode(user.email, 'password');
+            
             if (!result.success) {
                 showNotification('Error sending verification code.', 'error');
+                saveBtn.textContent = originalText;
+                saveBtn.disabled = false;
                 return;
             }
+            
+            saveBtn.textContent = originalText;
+            saveBtn.disabled = false;
             
             openVerificationModal(user.email, 'password', async (token) => {
                 const updateResult = DATA_MANAGER.changePassword(user.id, currentPassword, newPassword);
@@ -852,11 +874,23 @@ function openAccountSettings() {
             return;
         }
         
+        // Change button to sending state
+        const deleteBtn = document.getElementById('deleteAccountBtn');
+        const originalDeleteText = deleteBtn.textContent;
+        deleteBtn.textContent = 'Sending code...';
+        deleteBtn.disabled = true;
+        
         const result = await sendVerificationCode(user.email, 'delete');
+        
         if (!result.success) {
             showNotification('Error sending verification code.', 'error');
+            deleteBtn.textContent = originalDeleteText;
+            deleteBtn.disabled = false;
             return;
         }
+        
+        deleteBtn.textContent = originalDeleteText;
+        deleteBtn.disabled = false;
         
         openVerificationModal(user.email, 'delete', async (token) => {
             const deleteResult = DATA_MANAGER.deleteAccount(user.id, password);
@@ -1046,10 +1080,12 @@ authForm.addEventListener('submit', async (e) => {
                     showNotification('Password reset cancelled.', 'info');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Send Reset Code';
+                    pendingResetEmail = '';
+                    pendingResetUser = null;
                     return;
                 }
                 
-                // Check if new password is same as old password
+                // Check if new password is same as old
                 if (DATA_MANAGER.verifyPassword(newPassword, pendingResetUser.password)) {
                     showNotification('New password must be different from your current password.', 'error');
                     authSubmitBtn.disabled = false;
@@ -1059,20 +1095,31 @@ authForm.addEventListener('submit', async (e) => {
                     return;
                 }
                 
-                const result = DATA_MANAGER.changePassword(pendingResetUser.id, pendingResetUser.password, newPassword);
-                if (result.success) {
-                    showNotification('Password reset successfully! Please sign in.', 'success');
-                    clearAllPasswordFields();
+                // Directly update the password without requiring current password verification
+                // Since this is a reset flow, we bypass the current password check
+                const users = DATA_MANAGER.loadUsers();
+                const index = users.findIndex(u => u.id === pendingResetUser.id);
+                
+                if (index === -1) {
+                    showNotification('User not found. Please try again.', 'error');
                     authSubmitBtn.disabled = false;
                     authSubmitBtn.textContent = 'Send Reset Code';
                     pendingResetEmail = '';
                     pendingResetUser = null;
-                    setTimeout(() => openModal('login'), 2000);
-                } else {
-                    showNotification('Error resetting password. Please try again.', 'error');
-                    authSubmitBtn.disabled = false;
-                    authSubmitBtn.textContent = 'Send Reset Code';
+                    return;
                 }
+                
+                // Update password directly
+                users[index].password = DATA_MANAGER.hashPassword(newPassword);
+                DATA_MANAGER.saveUsers(users);
+                
+                showNotification('Password reset successfully! Please sign in.', 'success');
+                clearAllPasswordFields();
+                authSubmitBtn.disabled = false;
+                authSubmitBtn.textContent = 'Send Reset Code';
+                pendingResetEmail = '';
+                pendingResetUser = null;
+                setTimeout(() => openModal('login'), 2000);
             });
             
         } else if (currentMode === 'signup') {
@@ -1384,8 +1431,20 @@ async function performTranslation() {
 
 translateBtn.addEventListener('click', performTranslation);
 
+inputText.addEventListener('input', () => {
+    const text = inputText.value.trim();
+    if (text) {
+        clearTimeout(inputText._typingTimer);
+        inputText._typingTimer = setTimeout(() => {
+            performTranslation();
+        }, 800);
+    }
+});
+
 inputText.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') performTranslation();
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        performTranslation();
+    }
 });
 
 document.getElementById('swapLang').addEventListener('click', () => {
@@ -1393,11 +1452,12 @@ document.getElementById('swapLang').addEventListener('click', () => {
     sourceLang.value = targetLang.value;
     targetLang.value = temp;
     outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+    inputText.value = '';
 });
 
 document.getElementById('copyOutput').addEventListener('click', async () => {
     const text = outputDisplay.textContent;
-    if (text && !text.includes('placeholder')) {
+    if (text && !text.includes('placeholder') && !text.includes('Please enter')) {
         await navigator.clipboard.writeText(text);
         showNotification('Copied!', 'success');
     }
@@ -1405,7 +1465,7 @@ document.getElementById('copyOutput').addEventListener('click', async () => {
 
 document.getElementById('speakOutput').addEventListener('click', () => {
     const text = outputDisplay.textContent;
-    if (text && !text.includes('placeholder')) {
+    if (text && !text.includes('placeholder') && !text.includes('Please enter')) {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = targetLang.value;
         window.speechSynthesis.speak(utterance);
@@ -1418,15 +1478,18 @@ document.getElementById('clearInput').addEventListener('click', () => {
 });
 
 // ============================================================
-// MIC
+// MIC - UPDATED with Auto-Translation
 // ============================================================
 const micBtn = document.getElementById('micBtn');
 const recordingStatus = document.getElementById('recordingStatus');
 let recognition = null;
 let isRecording = false;
+let isHoldMode = false;
 
-if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+// Check if Speech Recognition is supported
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (SpeechRecognition) {
     recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = true;
@@ -1435,28 +1498,43 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     recognition.onstart = () => {
         isRecording = true;
         micBtn.classList.add('recording');
-        recordingStatus.textContent = 'Listening... Speak now!';
+        recordingStatus.textContent = '🎤 Listening... Speak now!';
         micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
     };
     
     recognition.onresult = (event) => {
         let finalText = '';
+        let interimText = '';
+        
         for (let i = event.resultIndex; i < event.results.length; i++) {
             if (event.results[i].isFinal) {
                 finalText += event.results[i][0].transcript;
+            } else {
+                interimText += event.results[i][0].transcript;
             }
         }
+        
+        if (interimText) {
+            inputText.value = finalText + interimText;
+        }
+        
         if (finalText) {
             inputText.value = finalText;
-            setTimeout(performTranslation, 500);
+            setTimeout(() => {
+                performTranslation();
+            }, 300);
         }
     };
     
-    recognition.onerror = () => {
-        recordingStatus.textContent = 'Error. Click mic again.';
+    recognition.onerror = (event) => {
+        recordingStatus.textContent = '❌ Error. Click mic again.';
         micBtn.classList.remove('recording');
         micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
         isRecording = false;
+        
+        if (event.error === 'not-allowed') {
+            showNotification('Microphone access denied. Please allow microphone access.', 'error');
+        }
     };
     
     recognition.onend = () => {
@@ -1466,6 +1544,7 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         isRecording = false;
     };
     
+    // Click to toggle recording
     micBtn.addEventListener('click', () => {
         if (isRecording) {
             recognition.stop();
@@ -1474,9 +1553,54 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             recognition.start();
         }
     });
+    
+    // Press and hold functionality
+    micBtn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        if (!isRecording) {
+            isHoldMode = true;
+            recognition.lang = sourceLang.value;
+            recognition.start();
+        }
+    });
+    
+    micBtn.addEventListener('mouseup', (e) => {
+        e.preventDefault();
+        if (isHoldMode && isRecording) {
+            recognition.stop();
+            isHoldMode = false;
+        }
+    });
+    
+    micBtn.addEventListener('mouseleave', (e) => {
+        if (isHoldMode && isRecording) {
+            recognition.stop();
+            isHoldMode = false;
+        }
+    });
+    
+    // Touch events for mobile
+    micBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (!isRecording) {
+            isHoldMode = true;
+            recognition.lang = sourceLang.value;
+            recognition.start();
+        }
+    }, { passive: false });
+    
+    micBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (isHoldMode && isRecording) {
+            recognition.stop();
+            isHoldMode = false;
+        }
+    }, { passive: false });
+    
 } else {
     micBtn.disabled = true;
-    recordingStatus.textContent = 'Not supported';
+    micBtn.title = 'Speech recognition not supported in this browser';
+    recordingStatus.textContent = '⚠️ Not supported';
 }
 
 // ============================================================
