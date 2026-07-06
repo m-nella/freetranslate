@@ -16,6 +16,7 @@ let verificationDone = false;
 let pendingResetEmail = '';
 let pendingResetUser = null;
 let isRecording = false;
+let isProcessingSpeech = false;
 
 // ============================================================
 // DOM ELEMENTS
@@ -1481,7 +1482,6 @@ function stopRecordingIfActive() {
             micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
             recordingStatus.textContent = 'Click mic to speak';
         }
-        showNotification('⏹ Recording stopped.', 'info', 2000);
     }
 }
 
@@ -1492,12 +1492,9 @@ async function translateWithGoogle(text, sourceLangCode, targetLangCode) {
     if (sourceLangCode === 'auto' && text.length > 2) {
         const detectedLang = await detectLanguage(text);
         actualSource = detectedLang;
-        // Only update UI if detected language is valid
-        if (detectedLang && detectedLang !== 'en') {
+        // Update UI to show detected language
+        if (detectedLang && detectedLang !== 'auto') {
             updateSourceLanguage(detectedLang);
-        } else if (detectedLang === 'en') {
-            // For English, still show it
-            updateSourceLanguage('en');
         }
     }
     
@@ -1546,9 +1543,9 @@ async function performTranslation() {
     }
 }
 
-translateBtn.addEventListener('click', performTranslation);
-
-// Auto-translate on input with debounce
+// ============================================================
+// TRANSLATE ON TYPING
+// ============================================================
 let translateTimeout = null;
 
 inputText.addEventListener('input', () => {
@@ -1575,7 +1572,9 @@ inputText.addEventListener('keydown', (e) => {
     }
 });
 
-// Language change handlers
+// ============================================================
+// LANGUAGE CHANGE HANDLERS
+// ============================================================
 sourceLang.addEventListener('change', () => {
     stopRecordingIfActive();
     
@@ -1640,7 +1639,7 @@ document.getElementById('clearInput').addEventListener('click', () => {
 });
 
 // ============================================================
-// MIC - SIMPLE CLICK TO TOGGLE RECORDING
+// MIC - RECORDING WITH AUTO-DETECT AND AUTO-TRANSLATE
 // ============================================================
 const micBtn = document.getElementById('micBtn');
 const recordingStatus = document.getElementById('recordingStatus');
@@ -1681,9 +1680,20 @@ if (SpeechRecognition) {
             inputText.value = finalText + interimText;
         }
         
-        // When we have final text, auto-translate
+        // When we have final text, process it
         if (finalText) {
             inputText.value = finalText;
+            
+            // If auto-detect is selected, detect language and update dropdown
+            if (sourceLang.value === 'auto' && finalText.length > 2) {
+                detectLanguage(finalText).then(detectedLang => {
+                    if (detectedLang && detectedLang !== 'auto') {
+                        updateSourceLanguage(detectedLang);
+                    }
+                });
+            }
+            
+            // Auto-translate the final text
             clearTimeout(translateTimeout);
             translateTimeout = setTimeout(() => {
                 performTranslation();
@@ -1695,7 +1705,6 @@ if (SpeechRecognition) {
         console.warn('Speech recognition error:', event.error);
         
         if (event.error === 'no-speech') {
-            // Keep recording if still recording
             if (isRecording) {
                 return;
             }
@@ -1743,6 +1752,7 @@ if (SpeechRecognition) {
             recordingStatus.textContent = 'Click mic to speak';
             showNotification('⏹ Recording stopped.', 'info', 2000);
         } else {
+            // Use the current source language or default to 'en' for auto-detect
             const lang = sourceLang.value === 'auto' ? 'en' : sourceLang.value;
             recognition.lang = lang;
             try {
