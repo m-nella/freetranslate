@@ -300,254 +300,92 @@ function showConfirmationModal(title, message, confirmText = 'Confirm', cancelTe
     });
 }
 
-// ============ VERIFICATION MODAL ============
+// ============================================================
+// VERIFICATION MODAL - FIXED
+// ============================================================
 function openVerificationModal(email, action, callback) {
-    // Remove any existing modal
-    const existingModal = document.querySelector('.verification-modal-overlay');
-    if (existingModal) {
-        existingModal.remove();
-    }
-
-    // Create modal overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'verification-modal-overlay';
-    overlay.innerHTML = `
-        <div class="verification-modal">
-            <button class="verification-modal-close">&times;</button>
-            <h3>Verify Your Email</h3>
-            <p class="verification-text">We've sent a 6-digit verification code to <strong>${email}</strong></p>
-            <p class="verification-subtext">Please enter the code below to continue.</p>
-            
-            <form id="verification-form" class="verification-form">
-                <div class="verification-input-group">
-                    <input type="text" id="verification-code" class="verification-code-input" 
-                           maxlength="6" placeholder="Enter 6-digit code" 
-                           autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*">
-                    <button type="submit" id="verify-code-btn" class="verify-btn">Verify</button>
-                </div>
-                <div class="verification-error" id="verification-error"></div>
-                <div class="verification-success" id="verification-success"></div>
-                <div class="verification-actions">
-                    <button type="button" id="resend-code-btn" class="resend-btn">Resend Code</button>
-                    <span class="verification-timer" id="verification-timer"></span>
-                </div>
+    pendingEmail = email;
+    pendingAction = action;
+    isVerifying = false;
+    
+    // Remove any existing verification modal
+    const existing = document.getElementById('verificationModal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'verificationModal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content verification-content">
+            <span class="close-modal close-verification">&times;</span>
+            <h2>${action === 'signup' ? 'Verify Your Email' : action === 'signin' ? 'Verify Sign In' : action === 'reset' ? 'Reset Password' : action === 'delete' ? 'Delete Account' : action === 'email' ? 'Change Email' : action === 'password' ? 'Change Password' : 'Verify Email'}</h2>
+            <p class="verification-desc">Enter the 6-digit code sent to your email. Also check in SPAM/JUNK folder.</p>
+            <form id="verificationForm">
+                <input type="text" id="verificationCode" placeholder="Enter the 6-digit code sent to your email. Also check in SPAM/JUNK folder." maxlength="6" autocomplete="off" required>
+                <button type="submit" class="auth-submit-btn" id="verifySubmitBtn">Verify</button>
             </form>
+            <p class="auth-switch">Didn't receive code? <a href="#" id="resendCodeBtn">Resend Code</a></p>
         </div>
     `;
-
-    document.body.appendChild(overlay);
-
-    // Get elements
-    const modal = overlay.querySelector('.verification-modal');
-    const closeBtn = overlay.querySelector('.verification-modal-close');
-    const form = document.getElementById('verification-form');
-    const codeInput = document.getElementById('verification-code');
-    const verifyBtn = document.getElementById('verify-code-btn');
-    const errorDiv = document.getElementById('verification-error');
-    const successDiv = document.getElementById('verification-success');
-    const resendBtn = document.getElementById('resend-code-btn');
-    const timerSpan = document.getElementById('verification-timer');
-
-    // Prevent double verification
-    let isVerifying = false;
-    let isVerified = false;
-
-    // Close modal
-    function closeModal() {
-        if (overlay && overlay.parentNode) {
-            overlay.parentNode.removeChild(overlay);
-        }
-    }
-
-    // Show error message
-    function showError(message) {
-        errorDiv.textContent = message;
-        errorDiv.style.display = 'block';
-        successDiv.style.display = 'none';
-        setTimeout(() => {
-            errorDiv.style.display = 'none';
-        }, 5000);
-    }
-
-    // Show success message
-    function showSuccess(message) {
-        successDiv.textContent = message;
-        successDiv.style.display = 'block';
-        errorDiv.style.display = 'none';
-    }
-
-    // Handle verification
-    async function handleVerification(e) {
+    document.body.appendChild(modal);
+    
+    const closeBtn = modal.querySelector('.close-verification');
+    closeBtn.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    
+    const form = modal.querySelector('#verificationForm');
+    const submitBtn = modal.querySelector('#verifySubmitBtn');
+    
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        e.stopPropagation();
         
-        // Prevent duplicate submissions
-        if (isVerifying || isVerified) {
+        if (isVerifying) {
+            console.log('⏳ Already verifying, please wait...');
             return;
         }
-
-        const code = codeInput.value.trim();
         
-        // Validate input
+        const code = document.getElementById('verificationCode').value.trim();
         if (!code || code.length !== 6) {
-            showError('Please enter a valid 6-digit verification code.');
+            showNotification('Please enter a valid 6-digit code.', 'error');
             return;
         }
-
-        // Set verifying state
-        isVerifying = true;
-        verifyBtn.disabled = true;
-        verifyBtn.textContent = 'Verifying...';
-        errorDiv.style.display = 'none';
-        successDiv.style.display = 'none';
-
+        
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Verifying...';
+        
         try {
-            // Make verification request
-            const response = await fetch(`${API_BASE_URL}/auth/verify`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email: email,
-                    code: code,
-                    action: action
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                // Successfully verified
-                isVerified = true;
-                showSuccess('✅ Verification successful!');
-                
-                // Store token
-                if (data.token) {
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('userEmail', email);
+            const result = await verifyCode(email, code);
+            
+            if (result.success) {
+                showNotification('✅ Verification successful!', 'success');
+                modal.remove();
+                // Call the callback (this handles sign in, sign up, etc.)
+                if (callback) {
+                    await callback();
                 }
-
-                // Disable further submissions
-                verifyBtn.textContent = 'Verified ✓';
-                verifyBtn.style.backgroundColor = '#4CAF50';
-                codeInput.disabled = true;
-
-                // Close modal after a short delay
-                setTimeout(() => {
-                    closeModal();
-                    // Execute callback if provided
-                    if (typeof callback === 'function') {
-                        callback(data);
-                    }
-                }, 1000);
-
             } else {
-                // Verification failed
-                showError(data.message || 'Invalid verification code. Please try again.');
-                isVerifying = false;
-                verifyBtn.disabled = false;
-                verifyBtn.textContent = 'Verify';
-                codeInput.focus();
-                codeInput.select();
+                showNotification(result.error, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Verify';
             }
-
         } catch (error) {
-            console.error('Verification error:', error);
-            showError('Network error. Please try again.');
-            isVerifying = false;
-            verifyBtn.disabled = false;
-            verifyBtn.textContent = 'Verify';
-        }
-    }
-
-    // Handle resend code
-    async function handleResendCode() {
-        try {
-            resendBtn.disabled = true;
-            resendBtn.textContent = 'Sending...';
-
-            const response = await fetch(`${API_BASE_URL}/auth/send-code`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email: email,
-                    action: action
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                showSuccess('✅ New verification code sent!');
-                codeInput.value = '';
-                codeInput.focus();
-                
-                // Start timer
-                let seconds = 60;
-                timerSpan.textContent = `Resend available in ${seconds}s`;
-                const timer = setInterval(() => {
-                    seconds--;
-                    if (seconds <= 0) {
-                        clearInterval(timer);
-                        timerSpan.textContent = '';
-                        resendBtn.disabled = false;
-                        resendBtn.textContent = 'Resend Code';
-                    } else {
-                        timerSpan.textContent = `Resend available in ${seconds}s`;
-                    }
-                }, 1000);
-            } else {
-                showError(data.message || 'Failed to send code. Please try again.');
-                resendBtn.disabled = false;
-                resendBtn.textContent = 'Resend Code';
-            }
-
-        } catch (error) {
-            console.error('Resend error:', error);
-            showError('Network error. Please try again.');
-            resendBtn.disabled = false;
-            resendBtn.textContent = 'Resend Code';
-        }
-    }
-
-    // Event Listeners
-    form.addEventListener('submit', handleVerification);
-
-    // Close button
-    closeBtn.addEventListener('click', closeModal);
-
-    // Click outside to close
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-            closeModal();
+            console.error('❌ Verification error:', error);
+            showNotification('An error occurred during verification.', 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Verify';
         }
     });
-
-    // Resend button
-    resendBtn.addEventListener('click', handleResendCode);
-
-    // Auto-focus on input
-    setTimeout(() => {
-        codeInput.focus();
-    }, 100);
-
-    // Handle Enter key on input
-    codeInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            if (!isVerifying && !isVerified) {
-                form.dispatchEvent(new Event('submit'));
-            }
-        }
-    });
-
-    // Handle Escape key
-    document.addEventListener('keydown', function escHandler(e) {
-        if (e.key === 'Escape') {
-            closeModal();
-            document.removeEventListener('keydown', escHandler);
+    
+    const resendBtn = modal.querySelector('#resendCodeBtn');
+    resendBtn.addEventListener('click', async () => {
+        clearAllNotifications();
+        const result = await sendVerificationCode(email, pendingAction);
+        if (result.success) {
+            showNotification('New code sent! 📧', 'success');
+        } else {
+            showNotification('Error sending code. Please try again.', 'error');
         }
     });
 }
