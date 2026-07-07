@@ -17,6 +17,7 @@ let pendingResetEmail = '';
 let pendingResetUser = null;
 let isRecording = false;
 let isTranslating = false;
+let translateTimeout = null;
 
 // ============================================================
 // DOM ELEMENTS
@@ -1516,11 +1517,13 @@ async function translateText(text, sourceLangCode, targetLangCode) {
     throw new Error('Translation failed');
 }
 
-// Perform translation - NO DELAY, ALWAYS TRANSLATE
+// Perform translation - WITH SPINNING BUTTON
 async function performTranslation() {
     const text = inputText.value.trim();
     if (!text) {
         outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+        translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+        translateBtn.disabled = false;
         if (sourceLang.value !== 'auto') {
             const detected = sourceLang.querySelector('option[data-detected="true"]');
             if (detected) {
@@ -1535,6 +1538,10 @@ async function performTranslation() {
         return;
     }
     
+    // Show spinning on translate button
+    translateBtn.disabled = true;
+    translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
+    
     isTranslating = true;
     
     try {
@@ -1548,6 +1555,8 @@ async function performTranslation() {
         outputDisplay.innerHTML = `<span class="placeholder">Error: ${error.message}</span>`;
     } finally {
         isTranslating = false;
+        translateBtn.disabled = false;
+        translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
     }
 }
 
@@ -1555,27 +1564,40 @@ async function performTranslation() {
 // INPUT HANDLERS - INSTANT TRANSLATION (NO DELAY)
 // ============================================================
 
-// On input change - translate immediately
+// On input change - translate immediately with debounce
 inputText.addEventListener('input', () => {
     const text = inputText.value.trim();
+    
+    // Clear any pending timeout
+    if (translateTimeout) {
+        clearTimeout(translateTimeout);
+        translateTimeout = null;
+    }
+    
     if (text) {
-        // If auto-detect is selected, detect language and translate
-        if (sourceLang.value === 'auto' && text.length > 2) {
-            detectLanguage(text).then(detectedLang => {
-                if (detectedLang && detectedLang !== 'auto') {
-                    updateSourceLanguage(detectedLang);
-                }
-                // Translate immediately after detection
+        // Small delay to avoid excessive API calls while typing fast
+        translateTimeout = setTimeout(() => {
+            // If auto-detect is selected, detect language first
+            if (sourceLang.value === 'auto' && text.length > 2) {
+                detectLanguage(text).then(detectedLang => {
+                    if (detectedLang && detectedLang !== 'auto') {
+                        updateSourceLanguage(detectedLang);
+                    }
+                    // Translate immediately after detection
+                    performTranslation();
+                }).catch(() => {
+                    performTranslation();
+                });
+            } else {
+                // Manual language - translate immediately
                 performTranslation();
-            }).catch(() => {
-                performTranslation();
-            });
-        } else {
-            // Manual language - translate immediately
-            performTranslation();
-        }
+            }
+            translateTimeout = null;
+        }, 100); // 100ms delay for smooth typing
     } else {
         outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+        translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+        translateBtn.disabled = false;
         if (sourceLang.value !== 'auto') {
             const detected = sourceLang.querySelector('option[data-detected="true"]');
             if (detected) {
@@ -1623,6 +1645,8 @@ document.getElementById('swapLang').addEventListener('click', () => {
     targetLang.value = temp;
     outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
     inputText.value = '';
+    translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+    translateBtn.disabled = false;
     resetSourceLanguage();
 });
 
@@ -1648,6 +1672,8 @@ document.getElementById('clearInput').addEventListener('click', () => {
     
     inputText.value = '';
     outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+    translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+    translateBtn.disabled = false;
     resetSourceLanguage();
 });
 
@@ -1676,7 +1702,6 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
     recognition.onresult = (event) => {
         let finalText = '';
         let interimText = '';
-        let fullText = '';
         
         for (let i = event.resultIndex; i < event.results.length; i++) {
             if (event.results[i].isFinal) {
@@ -1693,12 +1718,17 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
         
         // When final text is received, process it
         if (finalText) {
-            // Append to existing text
             const currentText = inputText.value;
             if (currentText.includes(finalText) || currentText === finalText) {
                 inputText.value = finalText;
             } else {
                 inputText.value = currentText + ' ' + finalText;
+            }
+            
+            // Clear any pending timeout and trigger translation immediately
+            if (translateTimeout) {
+                clearTimeout(translateTimeout);
+                translateTimeout = null;
             }
             
             // If auto-detect is selected, detect language
