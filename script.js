@@ -18,7 +18,7 @@ let pendingResetUser = null;
 let isRecording = false;
 let isTranslating = false;
 let translateQueue = false;
-let debugMode = true; // Set to false when done
+let debugMode = true;
 
 // ============================================================
 // DEBUG LOGGING
@@ -1370,37 +1370,49 @@ const outputDisplay = document.getElementById('outputText');
 const sourceLang = document.getElementById('sourceLang');
 const targetLang = document.getElementById('targetLang');
 
-// Create Translate From Button - Clickable
-const translateFromWrapper = document.createElement('div');
-translateFromWrapper.style.cssText = 'display: flex; flex-direction: column; width: 100%; position: relative;';
+// Create Translate From Button - Placed inside input box (below text)
+const translateFromContainer = document.createElement('div');
+translateFromContainer.style.cssText = 'display: none; margin-top: 6px; padding: 0 4px;';
 
-// Move sourceLang into wrapper
-if (sourceLang && sourceLang.parentNode) {
-    sourceLang.parentNode.insertBefore(translateFromWrapper, sourceLang);
-    translateFromWrapper.appendChild(sourceLang);
+// Find the input box header or parent to append the translate from button
+const inputBox = inputText.closest('.input-box');
+if (inputBox) {
+    // Find the input-tools div or append after textarea
+    const inputTools = inputBox.querySelector('.input-tools');
+    if (inputTools) {
+        inputBox.insertBefore(translateFromContainer, inputTools);
+    } else {
+        inputBox.appendChild(translateFromContainer);
+    }
 }
 
 // Create the clickable "Translate from: Language" button
 const translateFromBtn = document.createElement('button');
 translateFromBtn.className = 'translate-from-btn';
 translateFromBtn.style.cssText = `
-    font-size: 0.7rem;
-    color: var(--accent);
-    margin-top: 4px;
-    display: none;
+    font-size: 0.75rem;
+    color: #1a73e8;
     cursor: pointer;
-    padding: 4px 12px;
-    border-radius: 4px;
-    background: var(--accent-light);
-    border: 1px solid var(--accent);
+    padding: 4px 14px;
+    border-radius: 20px;
+    background: #e8f0fe;
+    border: none;
     transition: all 0.2s ease;
     user-select: none;
-    width: fit-content;
     font-family: var(--font);
     font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 `;
-translateFromBtn.title = 'Click to switch to this language';
-translateFromWrapper.appendChild(translateFromBtn);
+translateFromBtn.textContent = 'Translate from: ';
+translateFromContainer.appendChild(translateFromBtn);
+
+// Add arrow icon
+const arrowIcon = document.createElement('span');
+arrowIcon.textContent = ' →';
+arrowIcon.style.cssText = 'font-weight: 700; color: #1a73e8;';
+translateFromBtn.appendChild(arrowIcon);
 
 // Click handler for "Translate from" button
 translateFromBtn.addEventListener('click', () => {
@@ -1410,7 +1422,7 @@ translateFromBtn.addEventListener('click', () => {
         // Update source language
         sourceLang.value = detectedLang;
         // Hide the button
-        translateFromBtn.style.display = 'none';
+        translateFromContainer.style.display = 'none';
         translateFromBtn.dataset.lang = '';
         // Re-translate with new source language
         const text = inputText.value.trim();
@@ -1484,11 +1496,11 @@ populateLanguages();
 function updateTranslateFromBtn(detectedLang, text) {
     debugLog('updateTranslateFromBtn:', detectedLang, 'text length:', text?.length || 0);
     
-    // Hide if no text or text too short
-    if (!text || text.length < 2) {
-        translateFromBtn.style.display = 'none';
+    // Hide if no text or text too short OR if recording is active
+    if (!text || text.length < 2 || isRecording) {
+        translateFromContainer.style.display = 'none';
         translateFromBtn.dataset.lang = '';
-        debugLog('Button hidden - no text');
+        debugLog('Button hidden - no text or recording active');
         return;
     }
     
@@ -1497,20 +1509,23 @@ function updateTranslateFromBtn(detectedLang, text) {
     // Only show if detected language is different from selected
     if (detectedLang && detectedLang !== 'auto' && detectedLang !== selectedLang) {
         const langName = LANGUAGES.find(l => l.code === detectedLang)?.name || detectedLang;
-        translateFromBtn.textContent = `Translate from: ${langName}`;
+        // Keep the arrow icon
+        const textNode = translateFromBtn.childNodes[0];
+        if (textNode) {
+            textNode.textContent = `Translate from: ${langName}`;
+        }
         translateFromBtn.dataset.lang = detectedLang;
-        translateFromBtn.style.display = 'block';
+        translateFromContainer.style.display = 'block';
         debugLog('Button shown:', translateFromBtn.textContent);
     } else {
-        translateFromBtn.style.display = 'none';
+        translateFromContainer.style.display = 'none';
         translateFromBtn.dataset.lang = '';
         debugLog('Button hidden - matching language');
     }
 }
 
 function resetTranslateFromBtn() {
-    translateFromBtn.style.display = 'none';
-    translateFromBtn.textContent = '';
+    translateFromContainer.style.display = 'none';
     translateFromBtn.dataset.lang = '';
 }
 
@@ -1562,15 +1577,15 @@ async function performTranslation() {
     translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
     
     try {
-        // Detect language for "Translate from" button
+        // Detect language for "Translate from" button (only if NOT recording)
         let detectedLang = null;
-        if (text.length > 2) {
+        if (!isRecording && text.length > 2) {
             detectedLang = await detectLanguage(text);
             debugLog('Detected language for button:', detectedLang);
         }
         
         // Update the "Translate from" button
-        if (detectedLang && detectedLang !== 'auto') {
+        if (!isRecording && detectedLang && detectedLang !== 'auto') {
             updateTranslateFromBtn(detectedLang, text);
         } else {
             resetTranslateFromBtn();
@@ -1637,8 +1652,8 @@ inputText.addEventListener('input', () => {
         translateBtn.disabled = true;
         translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
         
-        // Detect language for "Translate from" button
-        if (text.length > 2) {
+        // Detect language for "Translate from" button (only if NOT recording)
+        if (!isRecording && text.length > 2) {
             detectLanguage(text).then(detectedLang => {
                 if (detectedLang && detectedLang !== 'auto') {
                     updateTranslateFromBtn(detectedLang, text);
@@ -1746,6 +1761,8 @@ function stopRecordingIfActive() {
             micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
             recordingStatus.textContent = 'Click mic to speak';
         }
+        // Reset translate from button when recording stops
+        resetTranslateFromBtn();
         debugLog('Recording stopped');
     }
 }
@@ -1763,6 +1780,8 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
         micBtn.classList.add('recording');
         recordingStatus.textContent = '🎤 Recording... Click to stop';
         micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+        // Hide translate from button during recording
+        resetTranslateFromBtn();
         debugLog('Recording started');
     };
     
@@ -1798,20 +1817,10 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
             
             const text = inputText.value.trim();
             if (text) {
-                // Detect language for "Translate from" button
-                if (text.length > 2) {
-                    detectLanguage(text).then(detectedLang => {
-                        if (detectedLang && detectedLang !== 'auto') {
-                            updateTranslateFromBtn(detectedLang, text);
-                        }
-                        performTranslation();
-                    }).catch(() => {
-                        performTranslation();
-                    });
-                } else {
-                    resetTranslateFromBtn();
-                    performTranslation();
-                }
+                // During recording, DO NOT show "Translate from" button
+                // Just translate using the selected source language
+                resetTranslateFromBtn();
+                performTranslation();
             }
         }
     };
@@ -1826,6 +1835,7 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
             micBtn.classList.remove('recording');
             micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
             recordingStatus.textContent = 'Click mic to speak';
+            resetTranslateFromBtn();
         }
     };
     
@@ -1841,11 +1851,13 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
                 micBtn.classList.remove('recording');
                 micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
                 recordingStatus.textContent = 'Click mic to speak';
+                resetTranslateFromBtn();
             }
         } else {
             micBtn.classList.remove('recording');
             micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
             recordingStatus.textContent = 'Click mic to speak';
+            resetTranslateFromBtn();
         }
     };
     
@@ -1863,6 +1875,15 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
             micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
             recordingStatus.textContent = 'Click mic to speak';
             showNotification('⏹ Recording stopped.', 'info', 2000);
+            // Re-check for translate from button after recording stops
+            const text = inputText.value.trim();
+            if (text && text.length > 2) {
+                detectLanguage(text).then(detectedLang => {
+                    if (detectedLang && detectedLang !== 'auto') {
+                        updateTranslateFromBtn(detectedLang, text);
+                    }
+                }).catch(() => {});
+            }
         } else {
             const lang = sourceLang.value || 'en';
             recognition.lang = lang;
