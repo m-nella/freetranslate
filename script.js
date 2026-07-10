@@ -1,6 +1,17 @@
 // ============================================================
-// FREE TRANSLATE LANGUAGE - Complete Application (FULLY FIXED)
+// FREE TRANSLATE LANGUAGE - Complete Application
 // ============================================================
+
+// ============================================================
+// WAIT FOR DOM TO BE FULLY LOADED - THIS FIXES MOBILE ISSUES
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+    initApp();
+});
+
+function initApp() {
+    console.log('✅ FreeTranslate Language initialized on:', navigator.userAgent);
+    console.log('📱 Screen size:', window.innerWidth, 'x', window.innerHeight);
 
 // ============================================================
 // STATE
@@ -20,10 +31,9 @@ let isTranslating = false;
 let translateQueue = false;
 let currentSpeech = null;
 let recognition = null;
-let recognitionLang = 'en';
 
 // ============================================================
-// DOM ELEMENTS
+// DOM ELEMENTS - GET AFTER DOM LOAD
 // ============================================================
 const authBtn = document.getElementById('authBtn');
 const authModal = document.getElementById('authModal');
@@ -43,6 +53,19 @@ const aboutModal = document.getElementById('aboutModal');
 const closeAboutModal = document.getElementById('closeAboutModal');
 const historyNavBtn = document.getElementById('historyNavBtn');
 
+// Translation elements
+const translateBtn = document.getElementById('translateBtn');
+const inputText = document.getElementById('inputText');
+const outputDisplay = document.getElementById('outputText');
+const sourceLang = document.getElementById('sourceLang');
+const targetLang = document.getElementById('targetLang');
+const micBtn = document.getElementById('micBtn');
+const recordingStatus = document.getElementById('recordingStatus');
+const swapBtn = document.getElementById('swapLang');
+const clearInputBtn = document.getElementById('clearInput');
+const copyOutputBtn = document.getElementById('copyOutput');
+const speakOutputBtn = document.getElementById('speakOutput');
+
 let profileMenu = null;
 let settingsModal = null;
 let historyModal = null;
@@ -54,11 +77,9 @@ function speakText(text, lang) {
     if (window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();
     }
-    
     if (!text || text.trim() === '') {
         return;
     }
-    
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang || 'en';
     currentSpeech = utterance;
@@ -95,7 +116,7 @@ function showNotification(message, type = 'info', duration = 5000) {
     
     const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
     const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
+    notification.className = 'notification ' + type;
     notification.innerHTML = `
         <span class="notif-icon">${icons[type] || 'ℹ️'}</span>
         <span class="notif-content">${message}</span>
@@ -104,23 +125,17 @@ function showNotification(message, type = 'info', duration = 5000) {
     const closeBtn = notification.querySelector('.notif-close');
     closeBtn.addEventListener('click', function(e) {
         e.stopPropagation();
-        notification.style.animation = 'slideOutRight 0.3s ease forwards';
-        setTimeout(function() {
-            if (notification.parentNode) {
-                notification.remove();
-            }
-        }, 300);
+        notification.remove();
     });
+    closeBtn.addEventListener('touchstart', function(e) {
+        e.stopPropagation();
+        notification.remove();
+    }, { passive: false });
     container.appendChild(notification);
     
     notificationTimeout = setTimeout(function() {
         if (notification.parentNode) {
-            notification.style.animation = 'slideOutRight 0.3s ease forwards';
-            setTimeout(function() {
-                if (notification.parentNode) {
-                    notification.remove();
-                }
-            }, 300);
+            notification.remove();
         }
         notificationTimeout = null;
     }, duration);
@@ -149,7 +164,6 @@ function createPasswordField(id, placeholder) {
         input.type = isPassword ? 'text' : 'password';
         this.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
     });
-    // Touch support
     toggle.addEventListener('touchstart', function(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -164,25 +178,24 @@ function createPasswordField(id, placeholder) {
 
 function bindPasswordToggles(container) {
     if (!container) return;
-    const fields = container.querySelectorAll('.password-field');
+    var fields = container.querySelectorAll('.password-field');
     fields.forEach(function(wrapper) {
-        const input = wrapper.querySelector('input');
-        const toggle = wrapper.querySelector('.password-toggle');
+        var input = wrapper.querySelector('input');
+        var toggle = wrapper.querySelector('.password-toggle');
         if (input && toggle) {
-            const newToggle = toggle.cloneNode(true);
+            var newToggle = toggle.cloneNode(true);
             toggle.parentNode.replaceChild(newToggle, toggle);
-            // Add both click and touch events
             newToggle.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                const isPassword = input.type === 'password';
+                var isPassword = input.type === 'password';
                 input.type = isPassword ? 'text' : 'password';
                 this.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
             });
             newToggle.addEventListener('touchstart', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                const isPassword = input.type === 'password';
+                var isPassword = input.type === 'password';
                 input.type = isPassword ? 'text' : 'password';
                 this.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
             }, { passive: false });
@@ -194,7 +207,8 @@ function bindPasswordToggles(container) {
 // CLEAR PASSWORD FIELDS
 // ============================================================
 function clearAllPasswordFields() {
-    document.querySelectorAll('input[type="password"]').forEach(function(input) {
+    var inputs = document.querySelectorAll('input[type="password"]');
+    inputs.forEach(function(input) {
         input.value = '';
     });
 }
@@ -203,10 +217,9 @@ function clearAllPasswordFields() {
 // VERIFICATION CODE SYSTEM
 // ============================================================
 
-async function sendVerificationCode(email, action = 'verification') {
+async function sendVerificationCode(email, action) {
     try {
-        const result = await DATA_MANAGER.storeVerificationCode(email, action);
-        
+        var result = await DATA_MANAGER.storeVerificationCode(email, action);
         if (result.success) {
             showNotification('📧 Verification code sent to your email. Please check your inbox and spam folder.', 'success');
             return { success: true, code: result.code };
@@ -224,17 +237,11 @@ async function verifyCode(email, code) {
     if (isVerifying) {
         isVerifying = false;
     }
-    
     isVerifying = true;
-    
     try {
-        const result = DATA_MANAGER.verifyCode(email, code, pendingAction);
-        
+        var result = DATA_MANAGER.verifyCode(email, code, pendingAction);
         if (result.success) {
-            return { 
-                success: true, 
-                token: 'local_' + email
-            };
+            return { success: true, token: 'local_' + email };
         } else {
             return { success: false, error: result.error || 'Invalid code. Please try again.' };
         }
@@ -249,9 +256,10 @@ async function verifyCode(email, code) {
 // CUSTOM MODALS
 // ============================================================
 
-function showPasswordConfirmModal(title, message, inputPlaceholder = 'Enter your password', inputType = 'password') {
+function showPasswordConfirmModal(title, message, inputPlaceholder, inputType) {
+    inputPlaceholder = inputPlaceholder || 'Enter your password';
     return new Promise(function(resolve) {
-        const modal = document.createElement('div');
+        var modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
         modal.innerHTML = `
@@ -272,20 +280,20 @@ function showPasswordConfirmModal(title, message, inputPlaceholder = 'Enter your
         
         bindPasswordToggles(modal);
         
-        const input = document.getElementById('promptPasswordInput');
-        const confirmBtn = modal.querySelector('#promptConfirm');
-        const cancelBtn = modal.querySelector('#promptCancel');
+        var input = document.getElementById('promptPasswordInput');
+        var confirmBtn = modal.querySelector('#promptConfirm');
+        var cancelBtn = modal.querySelector('#promptCancel');
         
         input.focus();
         
         confirmBtn.addEventListener('click', function() {
-            const value = input.value;
+            var value = input.value;
             modal.remove();
             resolve(value);
         });
         confirmBtn.addEventListener('touchstart', function(e) {
             e.preventDefault();
-            const value = input.value;
+            var value = input.value;
             modal.remove();
             resolve(value);
         }, { passive: false });
@@ -302,7 +310,7 @@ function showPasswordConfirmModal(title, message, inputPlaceholder = 'Enter your
         
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
-                const value = input.value;
+                var value = input.value;
                 modal.remove();
                 resolve(value);
             }
@@ -323,7 +331,7 @@ function showPasswordConfirmModal(title, message, inputPlaceholder = 'Enter your
 
 function showPasswordResetModal() {
     return new Promise(function(resolve) {
-        const modal = document.createElement('div');
+        var modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
         modal.innerHTML = `
@@ -348,57 +356,50 @@ function showPasswordResetModal() {
         
         bindPasswordToggles(modal);
         
-        const newPassword = document.getElementById('resetNewPassword');
-        const confirmPassword = document.getElementById('resetConfirmPassword');
-        const confirmBtn = modal.querySelector('#resetConfirm');
-        const cancelBtn = modal.querySelector('#resetCancel');
+        var newPassword = document.getElementById('resetNewPassword');
+        var confirmPassword = document.getElementById('resetConfirmPassword');
+        var confirmBtn = modal.querySelector('#resetConfirm');
+        var cancelBtn = modal.querySelector('#resetCancel');
         
         newPassword.focus();
         
         confirmBtn.addEventListener('click', function() {
-            const pass1 = newPassword.value;
-            const pass2 = confirmPassword.value;
+            var pass1 = newPassword.value;
+            var pass2 = confirmPassword.value;
             
             if (!pass1 || pass1.length < 8) {
                 showNotification('Password must be at least 8 characters.', 'error');
                 return;
             }
-            
             if (pass1 !== pass2) {
                 showNotification('Passwords do not match!', 'error');
                 return;
             }
-            
-            const validation = DATA_MANAGER.validatePasswordStrength(pass1);
+            var validation = DATA_MANAGER.validatePasswordStrength(pass1);
             if (!validation.valid) {
                 showNotification(validation.message, 'error');
                 return;
             }
-            
             modal.remove();
             resolve(pass1);
         });
         confirmBtn.addEventListener('touchstart', function(e) {
             e.preventDefault();
-            const pass1 = newPassword.value;
-            const pass2 = confirmPassword.value;
-            
+            var pass1 = newPassword.value;
+            var pass2 = confirmPassword.value;
             if (!pass1 || pass1.length < 8) {
                 showNotification('Password must be at least 8 characters.', 'error');
                 return;
             }
-            
             if (pass1 !== pass2) {
                 showNotification('Passwords do not match!', 'error');
                 return;
             }
-            
-            const validation = DATA_MANAGER.validatePasswordStrength(pass1);
+            var validation = DATA_MANAGER.validatePasswordStrength(pass1);
             if (!validation.valid) {
                 showNotification(validation.message, 'error');
                 return;
             }
-            
             modal.remove();
             resolve(pass1);
         }, { passive: false });
@@ -412,22 +413,14 @@ function showPasswordResetModal() {
             modal.remove();
             resolve(null);
         }, { passive: false });
-        
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                modal.remove();
-                resolve(null);
-            }
-        });
     });
 }
 
-// ============================================================
-// CONFIRMATION MODAL
-// ============================================================
-function showConfirmationModal(title, message, confirmText = 'Confirm', cancelText = 'Cancel') {
+function showConfirmationModal(title, message, confirmText, cancelText) {
+    confirmText = confirmText || 'Confirm';
+    cancelText = cancelText || 'Cancel';
     return new Promise(function(resolve) {
-        const modal = document.createElement('div');
+        var modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
         modal.innerHTML = `
@@ -461,13 +454,6 @@ function showConfirmationModal(title, message, confirmText = 'Confirm', cancelTe
             modal.remove();
             resolve(true);
         }, { passive: false });
-        
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                modal.remove();
-                resolve(false);
-            }
-        });
     });
 }
 
@@ -481,10 +467,10 @@ function openVerificationModal(email, action, callback) {
     isVerifying = false;
     verificationDone = false;
     
-    const existing = document.getElementById('verificationModal');
+    var existing = document.getElementById('verificationModal');
     if (existing) existing.remove();
     
-    const modal = document.createElement('div');
+    var modal = document.createElement('div');
     modal.className = 'modal';
     modal.id = 'verificationModal';
     modal.style.display = 'flex';
@@ -502,13 +488,7 @@ function openVerificationModal(email, action, callback) {
     `;
     document.body.appendChild(modal);
     
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            e.stopPropagation();
-        }
-    });
-    
-    const closeBtn = modal.querySelector('.close-verification');
+    var closeBtn = modal.querySelector('.close-verification');
     closeBtn.addEventListener('click', function() {
         modal.remove();
         isVerifying = false;
@@ -521,42 +501,34 @@ function openVerificationModal(email, action, callback) {
         verificationDone = false;
     }, { passive: false });
     
-    const form = modal.querySelector('#verificationForm');
-    const submitBtn = modal.querySelector('#verifySubmitBtn');
-    const codeInput = document.getElementById('verificationCode');
+    var form = modal.querySelector('#verificationForm');
+    var submitBtn = modal.querySelector('#verifySubmitBtn');
+    var codeInput = document.getElementById('verificationCode');
     
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
         e.stopPropagation();
-        
         if (verificationDone) return;
         if (isVerifying) return;
-        
-        const code = codeInput.value.trim();
+        var code = codeInput.value.trim();
         if (!code || code.length !== 6) {
             showNotification('Please enter a valid 6-digit code.', 'error');
             return;
         }
-        
         submitBtn.disabled = true;
         submitBtn.textContent = 'Verifying...';
         isVerifying = true;
-        
         try {
-            const result = await verifyCode(email, code);
-            
+            var result = await verifyCode(email, code);
             if (result.success) {
                 verificationDone = true;
                 submitBtn.textContent = '✓ Verified';
                 submitBtn.style.backgroundColor = '#4CAF50';
                 codeInput.disabled = true;
-                
                 showNotification('Verification successful!', 'success');
-                
                 if (result.token) {
                     localStorage.setItem('authToken', result.token);
                 }
-                
                 setTimeout(function() {
                     modal.remove();
                     if (typeof pendingCallback === 'function') {
@@ -566,7 +538,6 @@ function openVerificationModal(email, action, callback) {
                     isVerifying = false;
                     verificationDone = false;
                 }, 800);
-                
             } else {
                 showNotification(result.error || 'Invalid code. Please try again.', 'error');
                 submitBtn.disabled = false;
@@ -585,11 +556,10 @@ function openVerificationModal(email, action, callback) {
         }
     });
     
-    const resendBtn = modal.querySelector('#resendCodeBtn');
+    var resendBtn = modal.querySelector('#resendCodeBtn');
     resendBtn.addEventListener('click', async function(e) {
         e.preventDefault();
         clearAllNotifications();
-        
         verificationDone = false;
         isVerifying = false;
         submitBtn.disabled = false;
@@ -598,8 +568,7 @@ function openVerificationModal(email, action, callback) {
         codeInput.disabled = false;
         codeInput.value = '';
         codeInput.focus();
-        
-        const result = await sendVerificationCode(email, pendingAction);
+        var result = await sendVerificationCode(email, pendingAction);
         if (result.success) {
             showNotification('New code sent! Check your email.', 'success');
         } else {
@@ -609,7 +578,6 @@ function openVerificationModal(email, action, callback) {
     resendBtn.addEventListener('touchstart', async function(e) {
         e.preventDefault();
         clearAllNotifications();
-        
         verificationDone = false;
         isVerifying = false;
         submitBtn.disabled = false;
@@ -618,25 +586,20 @@ function openVerificationModal(email, action, callback) {
         codeInput.disabled = false;
         codeInput.value = '';
         codeInput.focus();
-        
-        const result = await sendVerificationCode(email, pendingAction);
+        var result = await sendVerificationCode(email, pendingAction);
         if (result.success) {
             showNotification('New code sent! Check your email.', 'success');
         } else {
             showNotification('Error sending code. Please try again.', 'error');
         }
     }, { passive: false });
-    
-    setTimeout(function() {
-        codeInput.focus();
-    }, 200);
 }
 
 // ============================================================
 // AUTH STATE
 // ============================================================
 async function checkAuthStatus() {
-    const token = localStorage.getItem('authToken');
+    var token = localStorage.getItem('authToken');
     if (!token) {
         isLoggedIn = false;
         currentUser = null;
@@ -645,8 +608,7 @@ async function checkAuthStatus() {
         if (historyNavBtn) historyNavBtn.style.display = 'none';
         return;
     }
-    
-    const user = DATA_MANAGER.getCurrentUser();
+    var user = DATA_MANAGER.getCurrentUser();
     if (user) {
         currentUser = {
             id: user.id,
@@ -656,7 +618,7 @@ async function checkAuthStatus() {
             lastLogin: user.lastLogin
         };
         isLoggedIn = true;
-        authBtn.innerHTML = `<i class="fas fa-user-circle"></i> ${currentUser.username}`;
+        authBtn.innerHTML = '<i class="fas fa-user-circle"></i> ' + currentUser.username;
         authBtn.classList.add('logged-in');
         if (historyNavBtn) historyNavBtn.style.display = 'flex';
     } else {
@@ -670,23 +632,25 @@ async function checkAuthStatus() {
 }
 
 // ============================================================
-// AUTH BUTTON - With touch support
+// AUTH BUTTON
 // ============================================================
-authBtn.addEventListener('click', function() {
-    if (isLoggedIn) {
-        toggleProfileMenu();
-    } else {
-        openModal('login');
-    }
-});
-authBtn.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    if (isLoggedIn) {
-        toggleProfileMenu();
-    } else {
-        openModal('login');
-    }
-}, { passive: false });
+function setupAuthButton() {
+    authBtn.addEventListener('click', function() {
+        if (isLoggedIn) {
+            toggleProfileMenu();
+        } else {
+            openModal('login');
+        }
+    });
+    authBtn.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        if (isLoggedIn) {
+            toggleProfileMenu();
+        } else {
+            openModal('login');
+        }
+    }, { passive: false });
+}
 
 // ============================================================
 // PROFILE MENU
@@ -697,7 +661,6 @@ function toggleProfileMenu() {
         profileMenu = null;
         return;
     }
-    
     if (!currentUser) return;
     
     profileMenu = document.createElement('div');
@@ -724,7 +687,7 @@ function toggleProfileMenu() {
     `;
     document.body.appendChild(profileMenu);
     
-    const rect = authBtn.getBoundingClientRect();
+    var rect = authBtn.getBoundingClientRect();
     profileMenu.style.top = rect.bottom + 10 + 'px';
     profileMenu.style.right = window.innerWidth - rect.right + 'px';
     
@@ -740,7 +703,7 @@ function toggleProfileMenu() {
     
     profileMenu.querySelectorAll('.user-menu-item').forEach(function(item) {
         item.addEventListener('click', function() {
-            const action = this.dataset.action;
+            var action = this.dataset.action;
             if (profileMenu) {
                 profileMenu.remove();
                 profileMenu = null;
@@ -751,7 +714,7 @@ function toggleProfileMenu() {
         });
         item.addEventListener('touchstart', function(e) {
             e.preventDefault();
-            const action = this.dataset.action;
+            var action = this.dataset.action;
             if (profileMenu) {
                 profileMenu.remove();
                 profileMenu = null;
@@ -783,13 +746,12 @@ function logoutUser() {
 // PROFILE MODAL
 // ============================================================
 function openProfileModal() {
-    const user = DATA_MANAGER.getCurrentUser();
+    var user = DATA_MANAGER.getCurrentUser();
     if (!user) {
         showNotification('Please sign in to view profile.', 'warning');
         return;
     }
-    
-    const modal = document.createElement('div');
+    var modal = document.createElement('div');
     modal.className = 'modal';
     modal.style.display = 'flex';
     modal.innerHTML = `
@@ -814,11 +776,6 @@ function openProfileModal() {
     
     modal.querySelector('.close-profile').addEventListener('click', function() { modal.remove(); });
     modal.querySelector('.close-profile').addEventListener('touchstart', function(e) { e.preventDefault(); modal.remove(); }, { passive: false });
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            modal.remove();
-        }
-    });
     
     modal.querySelector('#goToSettingsBtn').addEventListener('click', function() {
         modal.remove();
@@ -835,13 +792,12 @@ function openProfileModal() {
 // ACCOUNT SETTINGS
 // ============================================================
 function openAccountSettings() {
-    const user = DATA_MANAGER.getCurrentUser();
+    var user = DATA_MANAGER.getCurrentUser();
     if (!user) {
         showNotification('Please sign in to access settings.', 'warning');
         return;
     }
-    
-    const modal = document.createElement('div');
+    var modal = document.createElement('div');
     modal.className = 'modal';
     modal.id = 'settingsModal';
     modal.style.display = 'flex';
@@ -882,54 +838,42 @@ function openAccountSettings() {
     
     modal.querySelector('.close-settings').addEventListener('click', function() { modal.remove(); });
     modal.querySelector('.close-settings').addEventListener('touchstart', function(e) { e.preventDefault(); modal.remove(); }, { passive: false });
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            modal.remove();
-        }
-    });
     
     modal.querySelector('#saveSettingsBtn').addEventListener('click', async function() {
-        const newEmail = document.getElementById('settingsEmail').value;
-        const currentPassword = document.getElementById('settingsCurrentPassword').value;
-        const newPassword = document.getElementById('settingsNewPassword').value;
-        const confirmPassword = document.getElementById('settingsConfirmPassword').value;
+        var newEmail = document.getElementById('settingsEmail').value;
+        var currentPassword = document.getElementById('settingsCurrentPassword').value;
+        var newPassword = document.getElementById('settingsNewPassword').value;
+        var confirmPassword = document.getElementById('settingsConfirmPassword').value;
         
         if (!currentPassword) {
             showNotification('Please enter your current password.', 'error');
             return;
         }
-        
         if (!DATA_MANAGER.verifyPassword(currentPassword, user.password)) {
             showNotification('Current password is incorrect.', 'error');
             return;
         }
-        
         if (newEmail && newEmail !== user.email) {
-            const existing = DATA_MANAGER.findUserByEmail(newEmail);
+            var existing = DATA_MANAGER.findUserByEmail(newEmail);
             if (existing && existing.id !== user.id) {
                 showNotification('Email already in use by another account.', 'error');
                 return;
             }
-            
-            const saveBtn = document.getElementById('saveSettingsBtn');
-            const originalText = saveBtn.textContent;
+            var saveBtn = document.getElementById('saveSettingsBtn');
+            var originalText = saveBtn.textContent;
             saveBtn.textContent = 'Sending code...';
             saveBtn.disabled = true;
-            
-            const result = await sendVerificationCode(newEmail, 'email');
-            
+            var result = await sendVerificationCode(newEmail, 'email');
             if (!result.success) {
                 showNotification('Error sending verification code.', 'error');
                 saveBtn.textContent = originalText;
                 saveBtn.disabled = false;
                 return;
             }
-            
             saveBtn.textContent = originalText;
             saveBtn.disabled = false;
-            
             openVerificationModal(newEmail, 'email', async function(token) {
-                const updateResult = DATA_MANAGER.updateProfile(user.id, { 
+                var updateResult = DATA_MANAGER.updateProfile(user.id, { 
                     email: newEmail,
                     username: newEmail.split('@')[0]
                 });
@@ -947,7 +891,6 @@ function openAccountSettings() {
             });
             return;
         }
-        
         if (newPassword || confirmPassword) {
             if (newPassword !== confirmPassword) {
                 showNotification('New passwords do not match!', 'error');
@@ -957,32 +900,26 @@ function openAccountSettings() {
                 showNotification('New password must be different from your current password.', 'error');
                 return;
             }
-            
-            const validation = DATA_MANAGER.validatePasswordStrength(newPassword);
+            var validation = DATA_MANAGER.validatePasswordStrength(newPassword);
             if (!validation.valid) {
                 showNotification(validation.message, 'error');
                 return;
             }
-            
-            const saveBtn = document.getElementById('saveSettingsBtn');
-            const originalText = saveBtn.textContent;
+            var saveBtn = document.getElementById('saveSettingsBtn');
+            var originalText = saveBtn.textContent;
             saveBtn.textContent = 'Sending code...';
             saveBtn.disabled = true;
-            
-            const result = await sendVerificationCode(user.email, 'password');
-            
+            var result = await sendVerificationCode(user.email, 'password');
             if (!result.success) {
                 showNotification('Error sending verification code.', 'error');
                 saveBtn.textContent = originalText;
                 saveBtn.disabled = false;
                 return;
             }
-            
             saveBtn.textContent = originalText;
             saveBtn.disabled = false;
-            
             openVerificationModal(user.email, 'password', async function(token) {
-                const updateResult = DATA_MANAGER.changePassword(user.id, currentPassword, newPassword);
+                var updateResult = DATA_MANAGER.changePassword(user.id, currentPassword, newPassword);
                 if (updateResult.success) {
                     showNotification('Password updated successfully!', 'success');
                     modal.remove();
@@ -993,67 +930,56 @@ function openAccountSettings() {
             });
             return;
         }
-        
         showNotification('No changes made.', 'info');
         modal.remove();
         clearAllPasswordFields();
     });
-    modal.querySelector('#saveSettingsBtn').addEventListener('touchstart', async function(e) {
+    modal.querySelector('#saveSettingsBtn').addEventListener('touchstart', function(e) {
         e.preventDefault();
-        // Trigger the same logic
         this.click();
     }, { passive: false });
     
     modal.querySelector('#deleteAccountBtn').addEventListener('click', async function() {
-        const confirmed = await showConfirmationModal(
+        var confirmed = await showConfirmationModal(
             'Delete Account',
             'Are you sure you want to delete your account? This action cannot be undone.',
             'Delete Account',
             'Cancel'
         );
         if (!confirmed) return;
-        
-        const password = await showPasswordConfirmModal(
+        var password = await showPasswordConfirmModal(
             'Confirm Deletion',
             'Enter your password to confirm account deletion:',
             'Enter your password',
             'password'
         );
-        
         if (password === null) {
             showNotification('Account deletion cancelled.', 'info');
             return;
         }
-        
         if (!password || password.trim() === '') {
             showNotification('Password is required.', 'error');
             return;
         }
-        
         if (!DATA_MANAGER.verifyPassword(password, user.password)) {
             showNotification('Incorrect password. Please try again.', 'error');
             return;
         }
-        
-        const deleteBtn = document.getElementById('deleteAccountBtn');
-        const originalDeleteText = deleteBtn.textContent;
+        var deleteBtn = document.getElementById('deleteAccountBtn');
+        var originalDeleteText = deleteBtn.textContent;
         deleteBtn.textContent = 'Sending code...';
         deleteBtn.disabled = true;
-        
-        const result = await sendVerificationCode(user.email, 'delete');
-        
+        var result = await sendVerificationCode(user.email, 'delete');
         if (!result.success) {
             showNotification('Error sending verification code.', 'error');
             deleteBtn.textContent = originalDeleteText;
             deleteBtn.disabled = false;
             return;
         }
-        
         deleteBtn.textContent = originalDeleteText;
         deleteBtn.disabled = false;
-        
         openVerificationModal(user.email, 'delete', async function(token) {
-            const deleteResult = DATA_MANAGER.deleteAccount(user.id, password);
+            var deleteResult = DATA_MANAGER.deleteAccount(user.id, password);
             if (deleteResult.success) {
                 localStorage.removeItem('authToken');
                 showNotification('Account deleted successfully.', 'info');
@@ -1065,7 +991,7 @@ function openAccountSettings() {
             }
         });
     });
-    modal.querySelector('#deleteAccountBtn').addEventListener('touchstart', async function(e) {
+    modal.querySelector('#deleteAccountBtn').addEventListener('touchstart', function(e) {
         e.preventDefault();
         this.click();
     }, { passive: false });
@@ -1083,16 +1009,16 @@ function openModal(mode) {
     if (mode === 'login') {
         authModalTitle.textContent = 'Sign In';
         authSubmitBtn.textContent = 'Sign In';
-        authSwitchText.innerHTML = `Don't have an account? <a href="#" id="authSwitchLink">Create Account</a>`;
+        authSwitchText.innerHTML = 'Don\'t have an account? <a href="#" id="authSwitchLink">Create Account</a>';
         
-        const email = document.createElement('input');
+        var email = document.createElement('input');
         email.type = 'email';
         email.id = 'authEmail';
         email.placeholder = 'Email address';
         email.required = true;
         authFields.appendChild(email);
         
-        const password = createPasswordField('authPassword', 'Password');
+        var password = createPasswordField('authPassword', 'Password');
         authFields.appendChild(password);
         bindPasswordToggles(authModal);
         
@@ -1109,9 +1035,9 @@ function openModal(mode) {
     } else if (mode === 'reset') {
         authModalTitle.textContent = 'Reset Password';
         authSubmitBtn.textContent = 'Send Reset Code';
-        authSwitchText.innerHTML = `Remember password? <a href="#" id="authSwitchLink">Sign In</a>`;
+        authSwitchText.innerHTML = 'Remember password? <a href="#" id="authSwitchLink">Sign In</a>';
         
-        const email = document.createElement('input');
+        var email = document.createElement('input');
         email.type = 'email';
         email.id = 'authEmail';
         email.placeholder = 'Email address';
@@ -1122,28 +1048,28 @@ function openModal(mode) {
     } else if (mode === 'signup') {
         authModalTitle.textContent = 'Create Account';
         authSubmitBtn.textContent = 'Create Account';
-        authSwitchText.innerHTML = `Already have an account? <a href="#" id="authSwitchLink">Sign In</a>`;
+        authSwitchText.innerHTML = 'Already have an account? <a href="#" id="authSwitchLink">Sign In</a>';
         
-        const email = document.createElement('input');
+        var email = document.createElement('input');
         email.type = 'email';
         email.id = 'authEmail';
         email.placeholder = 'Email address';
         email.required = true;
         authFields.appendChild(email);
         
-        const password = createPasswordField('authPassword', 'Password (min 8 chars)');
+        var password = createPasswordField('authPassword', 'Password (min 8 chars)');
         authFields.appendChild(password);
-        const confirm = createPasswordField('authConfirmPassword', 'Confirm password');
+        var confirm = createPasswordField('authConfirmPassword', 'Confirm password');
         authFields.appendChild(confirm);
         bindPasswordToggles(authModal);
         
-        const hint = document.createElement('small');
+        var hint = document.createElement('small');
         hint.textContent = 'Password must contain: 8+ characters, uppercase, lowercase, number, special character';
         authFields.appendChild(hint);
         forgotPasswordLink.style.display = 'none';
     }
     
-    const switchLink = document.getElementById('authSwitchLink');
+    var switchLink = document.getElementById('authSwitchLink');
     if (switchLink) {
         switchLink.addEventListener('click', function(e) {
             e.preventDefault();
@@ -1187,17 +1113,13 @@ closeAuthModal.addEventListener('touchstart', function(e) {
 authForm.addEventListener('submit', async function(e) {
     e.preventDefault();
     e.stopPropagation();
-    
-    const email = document.getElementById('authEmail').value;
-    const password = document.getElementById('authPassword')?.value || '';
-    
+    var email = document.getElementById('authEmail').value;
+    var password = document.getElementById('authPassword')?.value || '';
     try {
         if (currentMode === 'login') {
             authSubmitBtn.disabled = true;
             authSubmitBtn.textContent = 'Signing in...';
-            
-            const result = DATA_MANAGER.login(email, password);
-            
+            var result = DATA_MANAGER.login(email, password);
             if (!result.success) {
                 if (result.error === 'Account not found. Please create an account.') {
                     showNotification('Account not found. Redirecting to Create Account...', 'error');
@@ -1212,17 +1134,14 @@ authForm.addEventListener('submit', async function(e) {
                     return;
                 }
             }
-            
-            const codeResult = await sendVerificationCode(email, 'signin');
+            var codeResult = await sendVerificationCode(email, 'signin');
             if (!codeResult.success) {
                 showNotification('Error sending verification code.', 'error');
                 authSubmitBtn.disabled = false;
                 authSubmitBtn.textContent = 'Sign In';
                 return;
             }
-            
             authModal.style.display = 'none';
-            
             openVerificationModal(email, 'signin', async function(token) {
                 showNotification('Sign in successful!', 'success');
                 await checkAuthStatus();
@@ -1230,35 +1149,28 @@ authForm.addEventListener('submit', async function(e) {
                 authSubmitBtn.textContent = 'Sign In';
                 clearAllPasswordFields();
             });
-            
         } else if (currentMode === 'reset') {
             authSubmitBtn.disabled = true;
             authSubmitBtn.textContent = 'Sending reset code...';
-            
-            const userExists = DATA_MANAGER.findUserByEmail(email);
+            var userExists = DATA_MANAGER.findUserByEmail(email);
             if (!userExists) {
                 showNotification('No account found with this email.', 'error');
                 authSubmitBtn.disabled = false;
                 authSubmitBtn.textContent = 'Send Reset Code';
                 return;
             }
-            
-            const codeResult = await sendVerificationCode(email, 'reset');
+            var codeResult = await sendVerificationCode(email, 'reset');
             if (!codeResult.success) {
                 showNotification('Error sending reset code.', 'error');
                 authSubmitBtn.disabled = false;
                 authSubmitBtn.textContent = 'Send Reset Code';
                 return;
             }
-            
             pendingResetEmail = email;
             pendingResetUser = userExists;
-            
             authModal.style.display = 'none';
-            
             openVerificationModal(email, 'reset', async function(token) {
-                const newPassword = await showPasswordResetModal();
-                
+                var newPassword = await showPasswordResetModal();
                 if (newPassword === null) {
                     showNotification('Password reset cancelled.', 'info');
                     authSubmitBtn.disabled = false;
@@ -1267,7 +1179,6 @@ authForm.addEventListener('submit', async function(e) {
                     pendingResetUser = null;
                     return;
                 }
-                
                 if (DATA_MANAGER.verifyPassword(newPassword, pendingResetUser.password)) {
                     showNotification('New password must be different from your current password.', 'error');
                     authSubmitBtn.disabled = false;
@@ -1276,10 +1187,8 @@ authForm.addEventListener('submit', async function(e) {
                     pendingResetUser = null;
                     return;
                 }
-                
-                const users = DATA_MANAGER.loadUsers();
-                const index = users.findIndex(function(u) { return u.id === pendingResetUser.id; });
-                
+                var users = DATA_MANAGER.loadUsers();
+                var index = users.findIndex(function(u) { return u.id === pendingResetUser.id; });
                 if (index === -1) {
                     showNotification('User not found. Please try again.', 'error');
                     authSubmitBtn.disabled = false;
@@ -1288,10 +1197,8 @@ authForm.addEventListener('submit', async function(e) {
                     pendingResetUser = null;
                     return;
                 }
-                
                 users[index].password = DATA_MANAGER.hashPassword(newPassword);
                 DATA_MANAGER.saveUsers(users);
-                
                 showNotification('Password reset successfully! Please sign in.', 'success');
                 clearAllPasswordFields();
                 authSubmitBtn.disabled = false;
@@ -1300,32 +1207,25 @@ authForm.addEventListener('submit', async function(e) {
                 pendingResetUser = null;
                 setTimeout(function() { openModal('login'); }, 2000);
             });
-            
         } else if (currentMode === 'signup') {
-            const confirmPassword = document.getElementById('authConfirmPassword')?.value || '';
-            const username = email.split('@')[0];
-            
+            var confirmPassword = document.getElementById('authConfirmPassword')?.value || '';
+            var username = email.split('@')[0];
             if (password !== confirmPassword) {
                 showNotification('Passwords do not match!', 'error');
                 return;
             }
-            
-            const validation = DATA_MANAGER.validatePasswordStrength(password);
+            var validation = DATA_MANAGER.validatePasswordStrength(password);
             if (!validation.valid) {
                 showNotification(validation.message, 'error');
                 return;
             }
-            
             if (!DATA_MANAGER.validateEmail(email)) {
                 showNotification('Invalid email format.', 'error');
                 return;
             }
-            
             authSubmitBtn.disabled = true;
             authSubmitBtn.textContent = 'Creating account...';
-            
-            const result = DATA_MANAGER.createUser(email, password, username);
-            
+            var result = DATA_MANAGER.createUser(email, password, username);
             if (!result.success) {
                 if (result.error === 'Email already registered. Please sign in.') {
                     showNotification('Email already registered. Redirecting to Sign In...', 'error');
@@ -1340,17 +1240,14 @@ authForm.addEventListener('submit', async function(e) {
                     return;
                 }
             }
-            
-            const codeResult = await sendVerificationCode(email, 'signup');
+            var codeResult = await sendVerificationCode(email, 'signup');
             if (!codeResult.success) {
                 showNotification('Error sending verification code.', 'error');
                 authSubmitBtn.disabled = false;
                 authSubmitBtn.textContent = 'Create Account';
                 return;
             }
-            
             authModal.style.display = 'none';
-            
             openVerificationModal(email, 'signup', async function(token) {
                 showNotification('Account created successfully!', 'success');
                 await checkAuthStatus();
@@ -1369,14 +1266,16 @@ authForm.addEventListener('submit', async function(e) {
 // ============================================================
 // HISTORY MODAL
 // ============================================================
-if (historyNavBtn) {
-    historyNavBtn.addEventListener('click', function() {
-        openHistoryModal();
-    });
-    historyNavBtn.addEventListener('touchstart', function(e) {
-        e.preventDefault();
-        openHistoryModal();
-    }, { passive: false });
+function setupHistoryButton() {
+    if (historyNavBtn) {
+        historyNavBtn.addEventListener('click', function() {
+            openHistoryModal();
+        });
+        historyNavBtn.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            openHistoryModal();
+        }, { passive: false });
+    }
 }
 
 function openHistoryModal() {
@@ -1384,13 +1283,11 @@ function openHistoryModal() {
         showNotification('Please sign in to view history.', 'warning');
         return;
     }
-    
     if (historyModal) {
         historyModal.style.display = 'flex';
         loadHistoryModal();
         return;
     }
-    
     historyModal = document.createElement('div');
     historyModal.className = 'modal';
     historyModal.id = 'historyModal';
@@ -1418,11 +1315,6 @@ function openHistoryModal() {
         e.preventDefault();
         historyModal.style.display = 'none';
     }, { passive: false });
-    historyModal.addEventListener('click', function(e) {
-        if (e.target === historyModal) {
-            historyModal.style.display = 'none';
-        }
-    });
     
     loadHistoryModal();
     
@@ -1431,15 +1323,14 @@ function openHistoryModal() {
             showNotification('Please sign in to manage history.', 'warning');
             return;
         }
-        const confirmed = await showConfirmationModal(
+        var confirmed = await showConfirmationModal(
             'Delete All History',
             'Are you sure you want to delete ALL your translation history? This action cannot be undone.',
             'Delete All',
             'Cancel'
         );
         if (!confirmed) return;
-        
-        const result = DATA_MANAGER.clearHistory(currentUser.email);
+        var result = DATA_MANAGER.clearHistory(currentUser.email);
         if (result.success) {
             await loadHistoryModal();
             showNotification('All history deleted.', 'info');
@@ -1447,34 +1338,28 @@ function openHistoryModal() {
             showNotification('Error deleting history.', 'error');
         }
     });
-    historyModal.querySelector('#deleteAllHistory').addEventListener('touchstart', async function(e) {
+    historyModal.querySelector('#deleteAllHistory').addEventListener('touchstart', function(e) {
         e.preventDefault();
         this.click();
     }, { passive: false });
 }
 
 async function loadHistoryModal() {
-    const historyList = document.getElementById('historyListModal');
+    var historyList = document.getElementById('historyListModal');
     if (!historyList) return;
-    
     if (!isLoggedIn || !currentUser) {
         historyList.innerHTML = '<p class="empty-history">Sign in to see your history.</p>';
         return;
     }
-    
     try {
-        const history = DATA_MANAGER.getHistory(currentUser.email);
-        
+        var history = DATA_MANAGER.getHistory(currentUser.email);
         if (!history || history.length === 0) {
-            historyList.innerHTML = `
-                <p class="empty-history">No translations yet. Start translating!</p>
-            `;
+            historyList.innerHTML = '<p class="empty-history">No translations yet. Start translating!</p>';
             return;
         }
-        
-        let html = '';
+        var html = '';
         history.forEach(function(item) {
-            const time = new Date(item.createdAt).toLocaleString();
+            var time = new Date(item.createdAt).toLocaleString();
             html += `
                 <div class="history-item" data-id="${item.id}">
                     <button class="h-delete" data-id="${item.id}" title="Delete this translation">
@@ -1490,19 +1375,17 @@ async function loadHistoryModal() {
             `;
         });
         historyList.innerHTML = html;
-        
         document.querySelectorAll('.h-delete').forEach(function(btn) {
             btn.addEventListener('click', async function() {
-                const id = this.dataset.id;
-                const confirmed = await showConfirmationModal(
+                var id = this.dataset.id;
+                var confirmed = await showConfirmationModal(
                     'Delete History Item',
                     'Are you sure you want to delete this translation history item?',
                     'Delete',
                     'Cancel'
                 );
                 if (!confirmed) return;
-                
-                const result = DATA_MANAGER.deleteHistoryItem(currentUser.email, id);
+                var result = DATA_MANAGER.deleteHistoryItem(currentUser.email, id);
                 if (result.success) {
                     await loadHistoryModal();
                     showNotification('History item deleted.', 'info');
@@ -1510,7 +1393,7 @@ async function loadHistoryModal() {
                     showNotification('Error deleting history item.', 'error');
                 }
             });
-            btn.addEventListener('touchstart', async function(e) {
+            btn.addEventListener('touchstart', function(e) {
                 e.preventDefault();
                 this.click();
             }, { passive: false });
@@ -1521,7 +1404,7 @@ async function loadHistoryModal() {
 }
 
 function getLanguageName(code) {
-    const languages = {
+    var languages = {
         'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
         'it': 'Italian', 'pt': 'Portuguese', 'ru': 'Russian', 'ja': 'Japanese',
         'ko': 'Korean', 'zh': 'Chinese', 'ar': 'Arabic', 'hi': 'Hindi',
@@ -1539,695 +1422,672 @@ function getLanguageName(code) {
 // ============================================================
 async function saveToHistory(original, translated, sourceLang, targetLang) {
     if (!isLoggedIn || !currentUser) return;
-    
-    const entry = {
+    var entry = {
         original: original,
         translated: translated,
         sourceLang: sourceLang,
         targetLang: targetLang
     };
-    
     DATA_MANAGER.saveHistory(currentUser.email, entry);
 }
 
 // ============================================================
 // TRANSLATION ENGINE
 // ============================================================
-const translateBtn = document.getElementById('translateBtn');
-const inputText = document.getElementById('inputText');
-const outputDisplay = document.getElementById('outputText');
-const sourceLang = document.getElementById('sourceLang');
-const targetLang = document.getElementById('targetLang');
+function setupTranslation() {
+    // Language list - NO AUTO-DETECT
+    var LANGUAGES = [
+        { code: 'en', name: 'English' },
+        { code: 'es', name: 'Spanish' },
+        { code: 'fr', name: 'French' },
+        { code: 'de', name: 'German' },
+        { code: 'it', name: 'Italian' },
+        { code: 'pt', name: 'Portuguese' },
+        { code: 'ru', name: 'Russian' },
+        { code: 'ja', name: 'Japanese' },
+        { code: 'ko', name: 'Korean' },
+        { code: 'zh', name: 'Chinese' },
+        { code: 'ar', name: 'Arabic' },
+        { code: 'hi', name: 'Hindi' },
+        { code: 'rw', name: 'Kinyarwanda' },
+        { code: 'rn', name: 'Kirundi' },
+        { code: 'sw', name: 'Swahili' },
+        { code: 'zu', name: 'Zulu' },
+        { code: 'yo', name: 'Yoruba' },
+        { code: 'ig', name: 'Igbo' },
+        { code: 'ha', name: 'Hausa' },
+        { code: 'ak', name: 'Akan' },
+        { code: 'am', name: 'Amharic' },
+        { code: 'so', name: 'Somali' },
+        { code: 'mg', name: 'Malagasy' },
+        { code: 'xh', name: 'Xhosa' },
+        { code: 'af', name: 'Afrikaans' },
+        { code: 'wo', name: 'Wolof' },
+        { code: 'ki', name: 'Kikuyu' },
+        { code: 'lg', name: 'Luganda' },
+        { code: 'ny', name: 'Chichewa' }
+    ];
 
-// Create Translate From Button - Google Translate Style
-const translateFromContainer = document.createElement('div');
-translateFromContainer.style.cssText = 'display: none; margin-top: 6px; padding: 0 4px;';
-
-const inputBox = inputText.closest('.input-box');
-if (inputBox) {
-    const inputTools = inputBox.querySelector('.input-tools');
-    if (inputTools) {
-        inputBox.insertBefore(translateFromContainer, inputTools);
-    } else {
-        inputBox.appendChild(translateFromContainer);
-    }
-}
-
-// Create the clickable "Translate from: Language" button
-const translateFromBtn = document.createElement('button');
-translateFromBtn.className = 'translate-from-btn';
-translateFromBtn.style.cssText = `
-    font-size: 0.7rem;
-    color: #1a73e8;
-    cursor: pointer;
-    padding: 3px 12px;
-    border-radius: 14px;
-    background: #e8f0fe;
-    border: 1px solid #dadce0;
-    transition: all 0.2s ease;
-    user-select: none;
-    font-family: var(--font);
-    font-weight: 500;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    letter-spacing: 0.3px;
-`;
-translateFromBtn.textContent = 'Translate from: ';
-translateFromContainer.appendChild(translateFromBtn);
-
-translateFromBtn.addEventListener('mouseenter', function() {
-    this.style.background = '#d2e3fc';
-});
-translateFromBtn.addEventListener('mouseleave', function() {
-    this.style.background = '#e8f0fe';
-});
-
-translateFromBtn.addEventListener('click', function() {
-    const detectedLang = this.dataset.lang;
-    if (detectedLang && detectedLang !== 'auto') {
-        sourceLang.value = detectedLang;
-        translateFromContainer.style.display = 'none';
-        this.dataset.lang = '';
-        const text = inputText.value.trim();
-        if (text) {
-            performTranslation();
+    function populateLanguages() {
+        console.log('🔄 Populating languages on:', window.innerWidth, 'x', window.innerHeight);
+        if (sourceLang) {
+            sourceLang.innerHTML = '';
+            LANGUAGES.forEach(function(lang) {
+                var option = document.createElement('option');
+                option.value = lang.code;
+                option.textContent = lang.name;
+                sourceLang.appendChild(option);
+            });
+            sourceLang.value = 'rw';
+            console.log('✅ Source language populated with', sourceLang.options.length, 'options');
+        } else {
+            console.error('❌ sourceLang element not found!');
         }
-        showNotification('Switched to: ' + getLanguageName(detectedLang), 'success', 2000);
-    }
-});
-translateFromBtn.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    const detectedLang = this.dataset.lang;
-    if (detectedLang && detectedLang !== 'auto') {
-        sourceLang.value = detectedLang;
-        translateFromContainer.style.display = 'none';
-        this.dataset.lang = '';
-        const text = inputText.value.trim();
-        if (text) {
-            performTranslation();
+        if (targetLang) {
+            targetLang.innerHTML = '';
+            LANGUAGES.forEach(function(lang) {
+                var option = document.createElement('option');
+                option.value = lang.code;
+                option.textContent = lang.name;
+                targetLang.appendChild(option);
+            });
+            targetLang.value = 'en';
+            console.log('✅ Target language populated with', targetLang.options.length, 'options');
+        } else {
+            console.error('❌ targetLang element not found!');
         }
-        showNotification('Switched to: ' + getLanguageName(detectedLang), 'success', 2000);
     }
-}, { passive: false });
 
-// Add Speaker Icon to Input Field
-const inputSpeakerBtn = document.createElement('button');
-inputSpeakerBtn.className = 'action-btn input-speaker-btn';
-inputSpeakerBtn.style.cssText = `
-    background: transparent;
-    border: none;
-    color: var(--text-light);
-    padding: 4px 8px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: var(--transition);
-    font-size: 0.85rem;
-`;
-inputSpeakerBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-inputSpeakerBtn.title = 'Read input text aloud';
+    // Populate languages
+    populateLanguages();
 
-const inputBoxActions = inputBox?.querySelector('.box-actions');
-if (inputBoxActions) {
-    inputBoxActions.appendChild(inputSpeakerBtn);
-}
-
-inputSpeakerBtn.addEventListener('click', function() {
-    const text = inputText.value.trim();
-    if (text) {
-        stopSpeech();
-        const lang = sourceLang.value || 'en';
-        speakText(text, lang);
-        showNotification('🔊 Reading input text...', 'info', 2000);
-    } else {
-        showNotification('No text to read.', 'warning', 2000);
+    // Create Translate From Container
+    var translateFromContainer = document.createElement('div');
+    translateFromContainer.style.cssText = 'display: none; margin-top: 6px; padding: 0 4px;';
+    var inputBox = inputText.closest('.input-box');
+    if (inputBox) {
+        var inputTools = inputBox.querySelector('.input-tools');
+        if (inputTools) {
+            inputBox.insertBefore(translateFromContainer, inputTools);
+        } else {
+            inputBox.appendChild(translateFromContainer);
+        }
     }
-});
-inputSpeakerBtn.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    this.click();
-}, { passive: false });
 
-// Update output speaker
-const outputSpeakerBtn = document.getElementById('speakOutput');
-if (outputSpeakerBtn) {
-    const newOutputSpeaker = outputSpeakerBtn.cloneNode(true);
-    outputSpeakerBtn.parentNode.replaceChild(newOutputSpeaker, outputSpeakerBtn);
-    newOutputSpeaker.addEventListener('click', function() {
-        const text = outputDisplay.textContent;
-        if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
-            stopSpeech();
-            speakText(text, targetLang.value);
-            showNotification('🔊 Reading translation...', 'info', 2000);
+    // Create Translate From Button
+    var translateFromBtn = document.createElement('button');
+    translateFromBtn.className = 'translate-from-btn';
+    translateFromBtn.style.cssText = `
+        font-size: 0.7rem;
+        color: #1a73e8;
+        cursor: pointer;
+        padding: 3px 12px;
+        border-radius: 14px;
+        background: #e8f0fe;
+        border: 1px solid #dadce0;
+        transition: all 0.2s ease;
+        user-select: none;
+        font-family: var(--font);
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        letter-spacing: 0.3px;
+    `;
+    translateFromBtn.textContent = 'Translate from: ';
+    translateFromContainer.appendChild(translateFromBtn);
+
+    translateFromBtn.addEventListener('click', function() {
+        var detectedLang = this.dataset.lang;
+        if (detectedLang && detectedLang !== 'auto') {
+            sourceLang.value = detectedLang;
+            translateFromContainer.style.display = 'none';
+            this.dataset.lang = '';
+            var text = inputText.value.trim();
+            if (text) {
+                performTranslation();
+            }
+            showNotification('Switched to: ' + getLanguageName(detectedLang), 'success', 2000);
         }
     });
-    newOutputSpeaker.addEventListener('touchstart', function(e) {
+    translateFromBtn.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        var detectedLang = this.dataset.lang;
+        if (detectedLang && detectedLang !== 'auto') {
+            sourceLang.value = detectedLang;
+            translateFromContainer.style.display = 'none';
+            this.dataset.lang = '';
+            var text = inputText.value.trim();
+            if (text) {
+                performTranslation();
+            }
+            showNotification('Switched to: ' + getLanguageName(detectedLang), 'success', 2000);
+        }
+    }, { passive: false });
+
+    // Add Speaker Icon to Input Field
+    var inputSpeakerBtn = document.createElement('button');
+    inputSpeakerBtn.className = 'action-btn input-speaker-btn';
+    inputSpeakerBtn.style.cssText = `
+        background: transparent;
+        border: none;
+        color: var(--text-light);
+        padding: 4px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: var(--transition);
+        font-size: 0.85rem;
+    `;
+    inputSpeakerBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+    inputSpeakerBtn.title = 'Read input text aloud';
+
+    var inputBoxActions = inputBox?.querySelector('.box-actions');
+    if (inputBoxActions) {
+        inputBoxActions.appendChild(inputSpeakerBtn);
+    }
+
+    inputSpeakerBtn.addEventListener('click', function() {
+        var text = inputText.value.trim();
+        if (text) {
+            stopSpeech();
+            var lang = sourceLang.value || 'en';
+            speakText(text, lang);
+            showNotification('🔊 Reading input text...', 'info', 2000);
+        } else {
+            showNotification('No text to read.', 'warning', 2000);
+        }
+    });
+    inputSpeakerBtn.addEventListener('touchstart', function(e) {
         e.preventDefault();
         this.click();
     }, { passive: false });
-}
 
-// Language list - NO AUTO-DETECT
-const LANGUAGES = [
-    { code: 'en', name: 'English' },
-    { code: 'es', name: 'Spanish' },
-    { code: 'fr', name: 'French' },
-    { code: 'de', name: 'German' },
-    { code: 'it', name: 'Italian' },
-    { code: 'pt', name: 'Portuguese' },
-    { code: 'ru', name: 'Russian' },
-    { code: 'ja', name: 'Japanese' },
-    { code: 'ko', name: 'Korean' },
-    { code: 'zh', name: 'Chinese' },
-    { code: 'ar', name: 'Arabic' },
-    { code: 'hi', name: 'Hindi' },
-    { code: 'rw', name: 'Kinyarwanda' },
-    { code: 'rn', name: 'Kirundi' },
-    { code: 'sw', name: 'Swahili' },
-    { code: 'zu', name: 'Zulu' },
-    { code: 'yo', name: 'Yoruba' },
-    { code: 'ig', name: 'Igbo' },
-    { code: 'ha', name: 'Hausa' },
-    { code: 'ak', name: 'Akan' },
-    { code: 'am', name: 'Amharic' },
-    { code: 'so', name: 'Somali' },
-    { code: 'mg', name: 'Malagasy' },
-    { code: 'xh', name: 'Xhosa' },
-    { code: 'af', name: 'Afrikaans' },
-    { code: 'wo', name: 'Wolof' },
-    { code: 'ki', name: 'Kikuyu' },
-    { code: 'lg', name: 'Luganda' },
-    { code: 'ny', name: 'Chichewa' }
-];
-
-function populateLanguages() {
-    if (sourceLang) {
-        sourceLang.innerHTML = '';
-        LANGUAGES.forEach(function(lang) {
-            const option = document.createElement('option');
-            option.value = lang.code;
-            option.textContent = lang.name;
-            sourceLang.appendChild(option);
+    // Update output speaker
+    if (speakOutputBtn) {
+        var newOutputSpeaker = speakOutputBtn.cloneNode(true);
+        speakOutputBtn.parentNode.replaceChild(newOutputSpeaker, speakOutputBtn);
+        newOutputSpeaker.addEventListener('click', function() {
+            var text = outputDisplay.textContent;
+            if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
+                stopSpeech();
+                speakText(text, targetLang.value);
+                showNotification('🔊 Reading translation...', 'info', 2000);
+            }
         });
-        sourceLang.value = 'rw';
+        newOutputSpeaker.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            this.click();
+        }, { passive: false });
     }
-    
-    if (targetLang) {
-        targetLang.innerHTML = '';
-        LANGUAGES.forEach(function(lang) {
-            const option = document.createElement('option');
-            option.value = lang.code;
-            option.textContent = lang.name;
-            targetLang.appendChild(option);
-        });
-        targetLang.value = 'en';
-    }
-}
-populateLanguages();
 
-function updateTranslateFromBtn(detectedLang, text) {
-    if (!text || text.length < 2 || isRecording) {
-        translateFromContainer.style.display = 'none';
-        translateFromBtn.dataset.lang = '';
-        return;
-    }
-    
-    const selectedLang = sourceLang.value;
-    
-    if (detectedLang && detectedLang !== 'auto' && detectedLang !== selectedLang) {
-        const langName = LANGUAGES.find(function(l) { return l.code === detectedLang; })?.name || detectedLang;
-        translateFromBtn.textContent = 'Translate from: ' + langName;
-        translateFromBtn.dataset.lang = detectedLang;
-        translateFromContainer.style.display = 'block';
-    } else {
-        translateFromContainer.style.display = 'none';
-        translateFromBtn.dataset.lang = '';
-    }
-}
-
-function resetTranslateFromBtn() {
-    translateFromContainer.style.display = 'none';
-    translateFromBtn.dataset.lang = '';
-}
-
-async function detectLanguage(text) {
-    if (!text || text.length < 3) return 'en';
-    try {
-        const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + encodeURIComponent(text);
-        const response = await fetch(url);
-        const data = await response.json();
-        if (data && data[2]) {
-            return data[2];
+    // Translation functions
+    function updateTranslateFromBtn(detectedLang, text) {
+        if (!text || text.length < 2 || isRecording) {
+            translateFromContainer.style.display = 'none';
+            translateFromBtn.dataset.lang = '';
+            return;
         }
-        return 'en';
-    } catch (error) {
-        return 'en';
-    }
-}
-
-// ============================================================
-// PERFORM TRANSLATION - INSTANT (NO DELAY)
-// ============================================================
-async function performTranslation() {
-    const text = inputText.value.trim();
-    
-    if (!text) {
-        outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
-        translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
-        translateBtn.disabled = false;
-        resetTranslateFromBtn();
-        return;
-    }
-    
-    if (isTranslating) {
-        translateQueue = true;
-        return;
-    }
-    
-    translateQueue = false;
-    isTranslating = true;
-    
-    translateBtn.disabled = true;
-    translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
-    
-    try {
-        let detectedLang = null;
-        if (!isRecording && text.length > 3) {
-            detectedLang = await detectLanguage(text);
-        }
-        
-        if (!isRecording && detectedLang && detectedLang !== 'auto') {
-            updateTranslateFromBtn(detectedLang, text);
+        var selectedLang = sourceLang.value;
+        if (detectedLang && detectedLang !== 'auto' && detectedLang !== selectedLang) {
+            var langName = LANGUAGES.find(function(l) { return l.code === detectedLang; })?.name || detectedLang;
+            translateFromBtn.textContent = 'Translate from: ' + langName;
+            translateFromBtn.dataset.lang = detectedLang;
+            translateFromContainer.style.display = 'block';
         } else {
+            translateFromContainer.style.display = 'none';
+            translateFromBtn.dataset.lang = '';
+        }
+    }
+
+    function resetTranslateFromBtn() {
+        translateFromContainer.style.display = 'none';
+        translateFromBtn.dataset.lang = '';
+    }
+
+    async function detectLanguage(text) {
+        if (!text || text.length < 3) return 'en';
+        try {
+            var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + encodeURIComponent(text);
+            var response = await fetch(url);
+            var data = await response.json();
+            if (data && data[2]) {
+                return data[2];
+            }
+            return 'en';
+        } catch (error) {
+            return 'en';
+        }
+    }
+
+    async function translateText(text, sourceLangCode, targetLangCode) {
+        if (!text || text.trim().length === 0) {
+            return '';
+        }
+        var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + sourceLangCode + '&tl=' + targetLangCode + '&dt=t&q=' + encodeURIComponent(text);
+        var response = await fetch(url);
+        var data = await response.json();
+        if (data && data[0]) {
+            return data[0].map(function(item) { return item[0]; }).join('');
+        }
+        throw new Error('Translation failed');
+    }
+
+    async function performTranslation() {
+        var text = inputText.value.trim();
+        if (!text) {
+            outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+            translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+            translateBtn.disabled = false;
             resetTranslateFromBtn();
+            return;
         }
-        
-        const sourceLangCode = sourceLang.value;
-        const translated = await translateText(text, sourceLangCode, targetLang.value);
-        outputDisplay.textContent = translated;
-        
-        if (isLoggedIn && currentUser) {
-            await saveToHistory(text, translated, sourceLangCode, targetLang.value);
+        if (isTranslating) {
+            translateQueue = true;
+            return;
         }
-    } catch (error) {
-        outputDisplay.innerHTML = '<span class="placeholder">Error: ' + error.message + '</span>';
-    } finally {
-        isTranslating = false;
-        translateBtn.disabled = false;
-        translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
-        
-        if (translateQueue) {
-            setTimeout(function() { performTranslation(); }, 30);
-        }
-    }
-}
-
-async function translateText(text, sourceLangCode, targetLangCode) {
-    if (!text || text.trim().length === 0) {
-        return '';
-    }
-    
-    const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + sourceLangCode + '&tl=' + targetLangCode + '&dt=t&q=' + encodeURIComponent(text);
-    const response = await fetch(url);
-    const data = await response.json();
-    if (data && data[0]) {
-        return data[0].map(function(item) { return item[0]; }).join('');
-    }
-    throw new Error('Translation failed');
-}
-
-translateBtn.addEventListener('click', function() {
-    if (!isTranslating) {
-        performTranslation();
-    }
-});
-translateBtn.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    if (!isTranslating) {
-        performTranslation();
-    }
-}, { passive: false });
-
-// ============================================================
-// INPUT HANDLERS - INSTANT (NO DELAY)
-// ============================================================
-
-inputText.addEventListener('input', function() {
-    const text = inputText.value.trim();
-    
-    if (!text) {
-        stopSpeech();
-    }
-    
-    if (text) {
+        translateQueue = false;
+        isTranslating = true;
         translateBtn.disabled = true;
         translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
-        
-        if (!isRecording && text.length > 3) {
-            detectLanguage(text).then(function(detectedLang) {
-                if (detectedLang && detectedLang !== 'auto') {
-                    updateTranslateFromBtn(detectedLang, text);
-                }
-                performTranslation();
-            }).catch(function() {
-                performTranslation();
-            });
-        } else {
-            resetTranslateFromBtn();
+        try {
+            var detectedLang = null;
+            if (!isRecording && text.length > 3) {
+                detectedLang = await detectLanguage(text);
+            }
+            if (!isRecording && detectedLang && detectedLang !== 'auto') {
+                updateTranslateFromBtn(detectedLang, text);
+            } else {
+                resetTranslateFromBtn();
+            }
+            var translated = await translateText(text, sourceLang.value, targetLang.value);
+            outputDisplay.textContent = translated;
+            if (isLoggedIn && currentUser) {
+                await saveToHistory(text, translated, sourceLang.value, targetLang.value);
+            }
+        } catch (error) {
+            outputDisplay.innerHTML = '<span class="placeholder">Error: ' + error.message + '</span>';
+        } finally {
+            isTranslating = false;
+            translateBtn.disabled = false;
+            translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+            if (translateQueue) {
+                setTimeout(function() { performTranslation(); }, 30);
+            }
+        }
+    }
+
+    // Event listeners
+    translateBtn.addEventListener('click', function() {
+        if (!isTranslating) {
             performTranslation();
         }
-    } else {
-        outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
-        translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
-        translateBtn.disabled = false;
-        resetTranslateFromBtn();
-    }
-});
-
-// ============================================================
-// LANGUAGE CHANGE HANDLERS
-// ============================================================
-sourceLang.addEventListener('change', function() {
-    stopRecordingIfActive();
-    resetTranslateFromBtn();
-    stopSpeech();
-    const text = inputText.value.trim();
-    if (text) {
-        performTranslation();
-    }
-});
-
-targetLang.addEventListener('change', function() {
-    stopRecordingIfActive();
-    stopSpeech();
-    const text = inputText.value.trim();
-    if (text) {
-        performTranslation();
-    }
-});
-
-document.getElementById('swapLang').addEventListener('click', function() {
-    stopRecordingIfActive();
-    stopSpeech();
-    
-    const temp = sourceLang.value;
-    sourceLang.value = targetLang.value;
-    targetLang.value = temp;
-    outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
-    inputText.value = '';
-    translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
-    translateBtn.disabled = false;
-    resetTranslateFromBtn();
-});
-document.getElementById('swapLang').addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    stopRecordingIfActive();
-    stopSpeech();
-    
-    const temp = sourceLang.value;
-    sourceLang.value = targetLang.value;
-    targetLang.value = temp;
-    outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
-    inputText.value = '';
-    translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
-    translateBtn.disabled = false;
-    resetTranslateFromBtn();
-}, { passive: false });
-
-document.getElementById('copyOutput').addEventListener('click', async function() {
-    const text = outputDisplay.textContent;
-    if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
-        await navigator.clipboard.writeText(text);
-        showNotification('Copied!', 'success');
-    }
-});
-document.getElementById('copyOutput').addEventListener('touchstart', async function(e) {
-    e.preventDefault();
-    const text = outputDisplay.textContent;
-    if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
-        await navigator.clipboard.writeText(text);
-        showNotification('Copied!', 'success');
-    }
-}, { passive: false });
-
-document.getElementById('clearInput').addEventListener('click', function() {
-    stopRecordingIfActive();
-    stopSpeech();
-    
-    inputText.value = '';
-    outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
-    translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
-    translateBtn.disabled = false;
-    resetTranslateFromBtn();
-});
-document.getElementById('clearInput').addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    stopRecordingIfActive();
-    stopSpeech();
-    
-    inputText.value = '';
-    outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
-    translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
-    translateBtn.disabled = false;
-    resetTranslateFromBtn();
-}, { passive: false });
-
-// ============================================================
-// MIC - RECORDING SYSTEM (LOCKED TO SELECTED LANGUAGE)
-// ============================================================
-const micBtn = document.getElementById('micBtn');
-const recordingStatus = document.getElementById('recordingStatus');
-
-function stopRecordingIfActive() {
-    if (isRecording) {
-        try {
-            if (recognition) {
-                recognition.stop();
-            }
-        } catch (e) {}
-        isRecording = false;
-        if (micBtn) {
-            micBtn.classList.remove('recording');
-            micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-            recordingStatus.textContent = 'Click mic to speak';
+    });
+    translateBtn.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        if (!isTranslating) {
+            performTranslation();
         }
-        resetTranslateFromBtn();
-    }
-}
+    }, { passive: false });
 
-if (window.SpeechRecognition || window.webkitSpeechRecognition) {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    function initRecognition() {
-        if (recognition) {
-            try { recognition.stop(); } catch(e) {}
+    inputText.addEventListener('input', function() {
+        var text = inputText.value.trim();
+        if (!text) {
+            stopSpeech();
         }
-        recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = sourceLang.value || 'en';
-        recognition.maxAlternatives = 1;
-        
-        recognition.onstart = function() {
-            isRecording = true;
-            micBtn.classList.add('recording');
-            recordingStatus.textContent = '🎤 Recording... Click to stop';
-            micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
-            resetTranslateFromBtn();
-        };
-        
-        recognition.onresult = function(event) {
-            let finalText = '';
-            let interimText = '';
-            
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                if (event.results[i].isFinal) {
-                    finalText += event.results[i][0].transcript;
-                } else {
-                    interimText += event.results[i][0].transcript;
-                }
-            }
-            
-            if (interimText) {
-                inputText.value = finalText + interimText;
-                translateBtn.disabled = true;
-                translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
-                performTranslation();
-            }
-            
-            if (finalText) {
-                const currentText = inputText.value;
-                if (currentText.includes(finalText) || currentText === finalText) {
-                    inputText.value = finalText;
-                } else {
-                    inputText.value = currentText + ' ' + finalText;
-                }
-                performTranslation();
-            }
-        };
-        
-        recognition.onerror = function(event) {
-            if (event.error === 'no-speech') return;
-            if (event.error === 'not-allowed') {
-                showNotification('Microphone access denied. Please allow microphone access.', 'error');
-            }
-            if (!isRecording) {
-                micBtn.classList.remove('recording');
-                micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-                recordingStatus.textContent = 'Click mic to speak';
-                resetTranslateFromBtn();
-            }
-        };
-        
-        recognition.onend = function() {
-            if (isRecording) {
-                try {
-                    // Always restart with the SELECTED source language
-                    recognition.lang = sourceLang.value || 'en';
-                    recognition.start();
-                } catch (e) {
-                    isRecording = false;
-                    micBtn.classList.remove('recording');
-                    micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-                    recordingStatus.textContent = 'Click mic to speak';
-                    resetTranslateFromBtn();
-                }
+        if (text) {
+            translateBtn.disabled = true;
+            translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
+            if (!isRecording && text.length > 3) {
+                detectLanguage(text).then(function(detectedLang) {
+                    if (detectedLang && detectedLang !== 'auto') {
+                        updateTranslateFromBtn(detectedLang, text);
+                    }
+                    performTranslation();
+                }).catch(function() {
+                    performTranslation();
+                });
             } else {
-                micBtn.classList.remove('recording');
-                micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-                recordingStatus.textContent = 'Click mic to speak';
                 resetTranslateFromBtn();
+                performTranslation();
             }
-        };
+        } else {
+            outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+            translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+            translateBtn.disabled = false;
+            resetTranslateFromBtn();
+        }
+    });
+
+    sourceLang.addEventListener('change', function() {
+        stopRecordingIfActive();
+        resetTranslateFromBtn();
+        stopSpeech();
+        var text = inputText.value.trim();
+        if (text) {
+            performTranslation();
+        }
+    });
+
+    targetLang.addEventListener('change', function() {
+        stopRecordingIfActive();
+        stopSpeech();
+        var text = inputText.value.trim();
+        if (text) {
+            performTranslation();
+        }
+    });
+
+    if (swapBtn) {
+        swapBtn.addEventListener('click', function() {
+            stopRecordingIfActive();
+            stopSpeech();
+            var temp = sourceLang.value;
+            sourceLang.value = targetLang.value;
+            targetLang.value = temp;
+            outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+            inputText.value = '';
+            translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+            translateBtn.disabled = false;
+            resetTranslateFromBtn();
+        });
+        swapBtn.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            stopRecordingIfActive();
+            stopSpeech();
+            var temp = sourceLang.value;
+            sourceLang.value = targetLang.value;
+            targetLang.value = temp;
+            outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+            inputText.value = '';
+            translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+            translateBtn.disabled = false;
+            resetTranslateFromBtn();
+        }, { passive: false });
     }
-    
-    // Initialize recognition
-    initRecognition();
-    
-    micBtn.addEventListener('click', function() {
+
+    if (copyOutputBtn) {
+        copyOutputBtn.addEventListener('click', async function() {
+            var text = outputDisplay.textContent;
+            if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
+                await navigator.clipboard.writeText(text);
+                showNotification('Copied!', 'success');
+            }
+        });
+        copyOutputBtn.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            this.click();
+        }, { passive: false });
+    }
+
+    if (clearInputBtn) {
+        clearInputBtn.addEventListener('click', function() {
+            stopRecordingIfActive();
+            stopSpeech();
+            inputText.value = '';
+            outputDisplay.innerHTML = '<span class="placeholder">Translation will appear here...</span>';
+            translateBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+            translateBtn.disabled = false;
+            resetTranslateFromBtn();
+        });
+        clearInputBtn.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            this.click();
+        }, { passive: false });
+    }
+
+    // ============================================================
+    // MIC - RECORDING SYSTEM
+    // ============================================================
+    function stopRecordingIfActive() {
         if (isRecording) {
-            isRecording = false;
             try {
                 if (recognition) {
                     recognition.stop();
                 }
             } catch (e) {}
-            micBtn.classList.remove('recording');
-            micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
-            recordingStatus.textContent = 'Click mic to speak';
-            showNotification('⏹ Recording stopped.', 'info', 2000);
-            const text = inputText.value.trim();
-            if (text && text.length > 3) {
-                detectLanguage(text).then(function(detectedLang) {
-                    if (detectedLang && detectedLang !== 'auto') {
-                        updateTranslateFromBtn(detectedLang, text);
-                    }
-                }).catch(function() {});
+            isRecording = false;
+            if (micBtn) {
+                micBtn.classList.remove('recording');
+                micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                recordingStatus.textContent = 'Click mic to speak';
             }
-        } else {
-            // Lock to selected source language
-            const lang = sourceLang.value || 'en';
+            resetTranslateFromBtn();
+        }
+    }
+
+    if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+        var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        function initRecognition() {
             if (recognition) {
-                recognition.lang = lang;
-                try {
-                    recognition.start();
-                } catch (e) {
-                    // If recognition failed, reinitialize and try again
-                    initRecognition();
+                try { recognition.stop(); } catch(e) {}
+            }
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = sourceLang.value || 'en';
+            recognition.maxAlternatives = 1;
+            
+            recognition.onstart = function() {
+                isRecording = true;
+                micBtn.classList.add('recording');
+                recordingStatus.textContent = '🎤 Recording... Click to stop';
+                micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+                resetTranslateFromBtn();
+            };
+            
+            recognition.onresult = function(event) {
+                var finalText = '';
+                var interimText = '';
+                for (var i = event.resultIndex; i < event.results.length; i++) {
+                    if (event.results[i].isFinal) {
+                        finalText += event.results[i][0].transcript;
+                    } else {
+                        interimText += event.results[i][0].transcript;
+                    }
+                }
+                if (interimText) {
+                    inputText.value = finalText + interimText;
+                    translateBtn.disabled = true;
+                    translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
+                    performTranslation();
+                }
+                if (finalText) {
+                    var currentText = inputText.value;
+                    if (currentText.includes(finalText) || currentText === finalText) {
+                        inputText.value = finalText;
+                    } else {
+                        inputText.value = currentText + ' ' + finalText;
+                    }
+                    performTranslation();
+                }
+            };
+            
+            recognition.onerror = function(event) {
+                if (event.error === 'no-speech') return;
+                if (event.error === 'not-allowed') {
+                    showNotification('Microphone access denied. Please allow microphone access.', 'error');
+                }
+                if (!isRecording) {
+                    micBtn.classList.remove('recording');
+                    micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                    recordingStatus.textContent = 'Click mic to speak';
+                    resetTranslateFromBtn();
+                }
+            };
+            
+            recognition.onend = function() {
+                if (isRecording) {
+                    try {
+                        recognition.lang = sourceLang.value || 'en';
+                        recognition.start();
+                    } catch (e) {
+                        isRecording = false;
+                        micBtn.classList.remove('recording');
+                        micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                        recordingStatus.textContent = 'Click mic to speak';
+                        resetTranslateFromBtn();
+                    }
+                } else {
+                    micBtn.classList.remove('recording');
+                    micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                    recordingStatus.textContent = 'Click mic to speak';
+                    resetTranslateFromBtn();
+                }
+            };
+        }
+        
+        initRecognition();
+        
+        if (micBtn) {
+            micBtn.addEventListener('click', function() {
+                if (isRecording) {
+                    isRecording = false;
+                    try {
+                        if (recognition) {
+                            recognition.stop();
+                        }
+                    } catch (e) {}
+                    micBtn.classList.remove('recording');
+                    micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                    recordingStatus.textContent = 'Click mic to speak';
+                    showNotification('⏹ Recording stopped.', 'info', 2000);
+                    var text = inputText.value.trim();
+                    if (text && text.length > 3) {
+                        detectLanguage(text).then(function(detectedLang) {
+                            if (detectedLang && detectedLang !== 'auto') {
+                                updateTranslateFromBtn(detectedLang, text);
+                            }
+                        }).catch(function() {});
+                    }
+                } else {
+                    var lang = sourceLang.value || 'en';
                     if (recognition) {
                         recognition.lang = lang;
                         try {
                             recognition.start();
-                        } catch (e2) {
-                            showNotification('Error starting microphone. Please try again.', 'error');
+                        } catch (e) {
+                            initRecognition();
+                            if (recognition) {
+                                recognition.lang = lang;
+                                try {
+                                    recognition.start();
+                                } catch (e2) {
+                                    showNotification('Error starting microphone. Please try again.', 'error');
+                                }
+                            }
+                        }
+                    } else {
+                        initRecognition();
+                        if (recognition) {
+                            recognition.lang = lang;
+                            try {
+                                recognition.start();
+                            } catch (e) {
+                                showNotification('Error starting microphone. Please try again.', 'error');
+                            }
                         }
                     }
                 }
-            } else {
-                initRecognition();
-                if (recognition) {
-                    recognition.lang = lang;
-                    try {
-                        recognition.start();
-                    } catch (e) {
-                        showNotification('Error starting microphone. Please try again.', 'error');
-                    }
-                }
+            });
+            micBtn.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                this.click();
+            }, { passive: false });
+        }
+        
+        // Update recognition language when source language changes
+        sourceLang.addEventListener('change', function() {
+            if (recognition && isRecording) {
+                recognition.lang = sourceLang.value || 'en';
             }
+        });
+        
+    } else {
+        if (micBtn) {
+            micBtn.disabled = true;
+            micBtn.title = 'Speech recognition not supported';
         }
-    });
-    micBtn.addEventListener('touchstart', function(e) {
-        e.preventDefault();
-        this.click();
-    }, { passive: false });
-    
-    // Update recognition language when source language changes
-    sourceLang.addEventListener('change', function() {
-        if (recognition && isRecording) {
-            recognition.lang = sourceLang.value || 'en';
+        if (recordingStatus) {
+            recordingStatus.textContent = '⚠️ Not supported';
         }
-    });
-    
-} else {
-    if (micBtn) {
-        micBtn.disabled = true;
-        micBtn.title = 'Speech recognition not supported';
-    }
-    if (recordingStatus) {
-        recordingStatus.textContent = '⚠️ Not supported';
     }
 }
 
 // ============================================================
-// THEME TOGGLE - With touch support
+// THEME TOGGLE
 // ============================================================
-if (themeToggle) {
-    themeToggle.addEventListener('click', function() {
-        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-        document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
-        this.innerHTML = isDark ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
-        localStorage.setItem('theme', isDark ? 'light' : 'dark');
-    });
-    themeToggle.addEventListener('touchstart', function(e) {
-        e.preventDefault();
-        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-        document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
-        this.innerHTML = isDark ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
-        localStorage.setItem('theme', isDark ? 'light' : 'dark');
-    }, { passive: false });
-    
-    if (localStorage.getItem('theme') === 'dark') {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+function setupThemeToggle() {
+    if (themeToggle) {
+        themeToggle.addEventListener('click', function() {
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            this.innerHTML = isDark ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+            localStorage.setItem('theme', isDark ? 'light' : 'dark');
+        });
+        themeToggle.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            this.innerHTML = isDark ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+            localStorage.setItem('theme', isDark ? 'light' : 'dark');
+        }, { passive: false });
+        
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+        }
     }
 }
 
 // ============================================================
-// ABOUT MODAL - With touch support
+// ABOUT MODAL
 // ============================================================
-aboutNavBtn.addEventListener('click', function() {
-    aboutModal.style.display = 'flex';
-});
-aboutNavBtn.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    aboutModal.style.display = 'flex';
-}, { passive: false });
-
-closeAboutModal.addEventListener('click', function() {
-    aboutModal.style.display = 'none';
-});
-closeAboutModal.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    aboutModal.style.display = 'none';
-}, { passive: false });
-
-aboutModal.addEventListener('click', function(e) {
-    if (e.target === aboutModal) {
-        aboutModal.style.display = 'none';
+function setupAboutModal() {
+    if (aboutNavBtn) {
+        aboutNavBtn.addEventListener('click', function() {
+            aboutModal.style.display = 'flex';
+        });
+        aboutNavBtn.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            aboutModal.style.display = 'flex';
+        }, { passive: false });
     }
-});
+    
+    if (closeAboutModal) {
+        closeAboutModal.addEventListener('click', function() {
+            aboutModal.style.display = 'none';
+        });
+        closeAboutModal.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            aboutModal.style.display = 'none';
+        }, { passive: false });
+    }
+    
+    if (aboutModal) {
+        aboutModal.addEventListener('click', function(e) {
+            if (e.target === aboutModal) {
+                aboutModal.style.display = 'none';
+            }
+        });
+    }
+}
 
 // ============================================================
-// INIT
+// INIT ALL
 // ============================================================
-checkAuthStatus();
+function setupAll() {
+    console.log('✅ Setting up all features...');
+    setupAuthButton();
+    setupHistoryButton();
+    setupTranslation();
+    setupThemeToggle();
+    setupAboutModal();
+    checkAuthStatus();
+    console.log('✅ All features initialized!');
+}
+
+// Start the application
+setupAll();
+
+} // End of DOMContentLoaded wrapper
