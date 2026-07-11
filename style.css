@@ -120,9 +120,7 @@ body {
     flex-wrap: nowrap;
 }
 
-/* ============================================================
-   NAV BUTTONS - AUTO-FIT ALL SCREENS
-   ============================================================ */
+/* NAV BUTTONS - AUTO-FIT ALL SCREENS */
 .theme-btn,
 .auth-btn,
 .nav-btn {
@@ -1420,7 +1418,6 @@ body {
     .nav-logo img { height: 28px; }
     .logo-text { font-size: 0.95rem; }
 
-    /* Buttons slightly smaller but text visible */
     .theme-btn,
     .auth-btn,
     .nav-btn {
