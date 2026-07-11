@@ -29,6 +29,9 @@
     var translateFromContainer = null;
     var translateFromBtn = null;
     var notificationTimeout = null;
+    var finalTranscript = '';
+    var interimTranscript = '';
+    var recordingTimeout = null;
 
     // ============================================================
     // LANGUAGE LIST
@@ -423,7 +426,7 @@
     }
 
     // ============================================================
-    // VERIFICATION MODAL - FIXED MODERN STYLING
+    // VERIFICATION MODAL
     // ============================================================
     function openVerificationModal(email, action, callback) {
         pendingEmail = email;
@@ -461,7 +464,6 @@
             '</div>';
         document.body.appendChild(modal);
         
-        // Style the verification code input
         var codeInput = $('verificationCode');
         if (codeInput) {
             codeInput.style.width = '100%';
@@ -1338,7 +1340,7 @@
     }
 
     // ============================================================
-    // TRANSLATION ENGINE
+    // TRANSLATION ENGINE WITH FIXED RECORDING
     // ============================================================
     function setupTranslation() {
         var sourceLang = $('sourceLang');
@@ -1352,6 +1354,10 @@
         var clearInputBtn = $('clearInput');
         var copyOutputBtn = $('copyOutput');
         var speakOutputBtn = $('speakOutput');
+        
+        // Reset transcripts
+        finalTranscript = '';
+        interimTranscript = '';
         
         // Create Translate From Container
         translateFromContainer = document.createElement('div');
@@ -1643,7 +1649,6 @@
                     navigator.clipboard.writeText(text).then(function() {
                         showNotification('Copied!', 'success');
                     }).catch(function() {
-                        // Fallback
                         var textarea = document.createElement('textarea');
                         textarea.value = text;
                         document.body.appendChild(textarea);
@@ -1676,7 +1681,9 @@
             resetTranslateFromBtn();
         });
 
-        // MIC - Recording System
+        // ============================================================
+        // MIC - RECORDING SYSTEM - FIXED FOR ALL DEVICES
+        // ============================================================
         function stopRecordingIfActive() {
             if (isRecording) {
                 try {
@@ -1685,12 +1692,23 @@
                     }
                 } catch (e) {}
                 isRecording = false;
+                if (recordingTimeout) {
+                    clearTimeout(recordingTimeout);
+                    recordingTimeout = null;
+                }
                 if (micBtn) {
                     removeClass(micBtn, 'recording');
                     micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
                     if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
                 }
                 resetTranslateFromBtn();
+                // Process final transcript
+                if (finalTranscript.trim()) {
+                    inputText.value = finalTranscript.trim();
+                    performTranslation();
+                }
+                finalTranscript = '';
+                interimTranscript = '';
             }
         }
 
@@ -1705,51 +1723,89 @@
                 recognition.continuous = true;
                 recognition.interimResults = true;
                 recognition.lang = sourceLang ? sourceLang.value || 'en' : 'en';
-                recognition.maxAlternatives = 1;
+                recognition.maxAlternatives = 3;
                 
                 recognition.onstart = function() {
                     isRecording = true;
+                    finalTranscript = '';
+                    interimTranscript = '';
                     if (micBtn) {
                         addClass(micBtn, 'recording');
                         micBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
                     }
                     if (recordingStatus) recordingStatus.textContent = '🎤 Recording... Click to stop';
                     resetTranslateFromBtn();
+                    
+                    // Auto-stop after 30 seconds of silence
+                    if (recordingTimeout) {
+                        clearTimeout(recordingTimeout);
+                    }
+                    recordingTimeout = setTimeout(function() {
+                        if (isRecording) {
+                            try {
+                                if (recognition) {
+                                    recognition.stop();
+                                }
+                            } catch(e) {}
+                            isRecording = false;
+                            if (micBtn) {
+                                removeClass(micBtn, 'recording');
+                                micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
+                            }
+                            if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
+                            if (finalTranscript.trim()) {
+                                inputText.value = finalTranscript.trim();
+                                performTranslation();
+                            }
+                            finalTranscript = '';
+                            interimTranscript = '';
+                        }
+                        recordingTimeout = null;
+                    }, 30000);
                 };
                 
                 recognition.onresult = function(event) {
-                    var finalText = '';
-                    var interimText = '';
+                    var currentFinal = '';
+                    var currentInterim = '';
+                    
                     for (var i = event.resultIndex; i < event.results.length; i++) {
                         if (event.results[i].isFinal) {
-                            finalText += event.results[i][0].transcript;
+                            currentFinal += event.results[i][0].transcript;
                         } else {
-                            interimText += event.results[i][0].transcript;
+                            currentInterim += event.results[i][0].transcript;
                         }
                     }
-                    if (interimText && inputText) {
-                        inputText.value = finalText + interimText;
+                    
+                    // Accumulate final results
+                    if (currentFinal) {
+                        finalTranscript += ' ' + currentFinal;
+                    }
+                    
+                    // Show interim results
+                    if (currentInterim || finalTranscript) {
+                        var displayText = (finalTranscript + ' ' + currentInterim).trim();
+                        if (inputText) {
+                            inputText.value = displayText;
+                        }
+                        // Translate interim results
                         if (translateBtn) {
                             translateBtn.disabled = true;
                             translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
                         }
                         performTranslation();
                     }
-                    if (finalText && inputText) {
-                        var currentText = inputText.value;
-                        if (currentText.indexOf(finalText) === 0 || currentText === finalText) {
-                            inputText.value = finalText;
-                        } else {
-                            inputText.value = currentText + ' ' + finalText;
-                        }
-                        performTranslation();
-                    }
                 };
                 
                 recognition.onerror = function(event) {
-                    if (event.error === 'no-speech') return;
+                    if (event.error === 'no-speech') {
+                        // Ignore no-speech errors
+                        return;
+                    }
                     if (event.error === 'not-allowed') {
-                        showNotification('Microphone access denied.', 'error');
+                        showNotification('Microphone access denied. Please allow microphone access.', 'error');
+                    }
+                    if (event.error === 'audio-capture') {
+                        showNotification('No microphone found. Please connect a microphone.', 'error');
                     }
                     if (!isRecording) {
                         if (micBtn) {
@@ -1762,7 +1818,13 @@
                 };
                 
                 recognition.onend = function() {
+                    if (recordingTimeout) {
+                        clearTimeout(recordingTimeout);
+                        recordingTimeout = null;
+                    }
+                    
                     if (isRecording) {
+                        // Try to restart if still recording
                         try {
                             recognition.lang = sourceLang ? sourceLang.value || 'en' : 'en';
                             recognition.start();
@@ -1774,6 +1836,13 @@
                             }
                             if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
                             resetTranslateFromBtn();
+                            // Process final transcript
+                            if (finalTranscript.trim()) {
+                                inputText.value = finalTranscript.trim();
+                                performTranslation();
+                            }
+                            finalTranscript = '';
+                            interimTranscript = '';
                         }
                     } else {
                         if (micBtn) {
@@ -1782,6 +1851,13 @@
                         }
                         if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
                         resetTranslateFromBtn();
+                        // Process final transcript
+                        if (finalTranscript.trim()) {
+                            inputText.value = finalTranscript.trim();
+                            performTranslation();
+                        }
+                        finalTranscript = '';
+                        interimTranscript = '';
                     }
                 };
             }
@@ -1790,25 +1866,31 @@
             
             on(micBtn, 'click', function() {
                 if (isRecording) {
+                    // Stop recording
                     isRecording = false;
                     try {
                         if (recognition) {
                             recognition.stop();
                         }
                     } catch (e) {}
+                    if (recordingTimeout) {
+                        clearTimeout(recordingTimeout);
+                        recordingTimeout = null;
+                    }
                     removeClass(micBtn, 'recording');
                     micBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak';
                     if (recordingStatus) recordingStatus.textContent = 'Click mic to speak';
                     showNotification('⏹ Recording stopped.', 'info', 2000);
-                    var text = inputText ? inputText.value.trim() : '';
-                    if (text && text.length > 3) {
-                        detectLanguage(text).then(function(detectedLang) {
-                            if (detectedLang && detectedLang !== 'auto') {
-                                updateTranslateFromBtn(detectedLang, text);
-                            }
-                        }).catch(function() {});
+                    
+                    // Process final transcript
+                    if (finalTranscript.trim()) {
+                        inputText.value = finalTranscript.trim();
+                        performTranslation();
                     }
+                    finalTranscript = '';
+                    interimTranscript = '';
                 } else {
+                    // Start recording
                     var lang = sourceLang ? sourceLang.value || 'en' : 'en';
                     if (recognition) {
                         recognition.lang = lang;
@@ -1821,7 +1903,7 @@
                                 try {
                                     recognition.start();
                                 } catch (e2) {
-                                    showNotification('Error starting mic.', 'error');
+                                    showNotification('Error starting microphone. Please try again.', 'error');
                                 }
                             }
                         }
@@ -1832,7 +1914,7 @@
                             try {
                                 recognition.start();
                             } catch (e) {
-                                showNotification('Error starting mic.', 'error');
+                                showNotification('Error starting microphone. Please try again.', 'error');
                             }
                         }
                     }
@@ -1851,6 +1933,8 @@
             if (micBtn) {
                 micBtn.disabled = true;
                 micBtn.title = 'Speech recognition not supported';
+                micBtn.style.opacity = '0.5';
+                micBtn.style.cursor = 'not-allowed';
             }
             if (recordingStatus) {
                 recordingStatus.textContent = '⚠️ Not supported';
@@ -1867,13 +1951,13 @@
             on(themeToggle, 'click', function() {
                 var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
                 document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
-                this.innerHTML = isDark ? '<i class="fas fa-moon"></i><span>Theme</span>' : '<i class="fas fa-sun"></i><span>Theme</span>';
+                this.innerHTML = isDark ? '<i class="fas fa-moon"></i> <span>Theme</span>' : '<i class="fas fa-sun"></i> <span>Theme</span>';
                 localStorage.setItem('theme', isDark ? 'light' : 'dark');
             });
             
             if (localStorage.getItem('theme') === 'dark') {
                 document.documentElement.setAttribute('data-theme', 'dark');
-                themeToggle.innerHTML = '<i class="fas fa-sun"></i><span>Theme</span>';
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i> <span>Theme</span>';
             }
         }
     }
@@ -1911,10 +1995,7 @@
     // INITIALIZATION
     // ============================================================
     function initApp() {
-        // Populate languages
         populateLanguageDropdowns();
-        
-        // Setup features
         setupAuthButton();
         setupCloseModal();
         setupAuthForm();
@@ -1922,8 +2003,6 @@
         setupTranslation();
         setupThemeToggle();
         setupAboutModal();
-        
-        // Check auth
         checkAuthStatus();
         
         console.log('✅ FreeTranslateLanguage initialized successfully!');
@@ -1938,7 +2017,6 @@
         initApp();
     }
 
-    // Run again on load for safety
     window.addEventListener('load', function() {
         var sourceLang = $('sourceLang');
         if (sourceLang && sourceLang.options.length === 0) {
