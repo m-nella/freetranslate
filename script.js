@@ -76,6 +76,7 @@
         return document.getElementById(id);
     }
 
+    // UNIVERSAL EVENT HANDLER - Works on all devices
     function on(el, event, handler) {
         if (!el) return;
         if (event === 'click') {
@@ -87,6 +88,19 @@
         } else {
             el.addEventListener(event, handler);
         }
+    }
+
+    // DIRECT EVENT BINDING - For dynamically created elements
+    function bindClick(el, handler) {
+        if (!el) return;
+        // Click event
+        el.addEventListener('click', handler);
+        // Touch event for mobile
+        el.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            handler(e);
+        }, { passive: false });
     }
 
     function createElement(tag, className, html) {
@@ -195,7 +209,7 @@
         container.appendChild(notification);
         
         var closeBtn = notification.querySelector('.notif-close');
-        on(closeBtn, 'click', function(e) {
+        bindClick(closeBtn, function(e) {
             e.stopPropagation();
             notification.remove();
         });
@@ -256,7 +270,7 @@
         toggle.innerHTML = '<i class="fas fa-eye"></i>';
         toggle.setAttribute('aria-label', 'Show password');
         
-        on(toggle, 'click', function(e) {
+        bindClick(toggle, function(e) {
             e.preventDefault();
             e.stopPropagation();
             var isPassword = input.type === 'password';
@@ -280,7 +294,7 @@
                 var newToggle = toggle.cloneNode(true);
                 toggle.parentNode.replaceChild(newToggle, toggle);
                 (function(inp, tog) {
-                    on(tog, 'click', function(e) {
+                    bindClick(tog, function(e) {
                         e.preventDefault();
                         e.stopPropagation();
                         var isPassword = inp.type === 'password';
@@ -352,12 +366,12 @@
                 '</div>';
             document.body.appendChild(modal);
             
-            on(modal.querySelector('#cancelConfirm'), 'click', function() {
+            bindClick(modal.querySelector('#cancelConfirm'), function() {
                 modal.remove();
                 resolve(false);
             });
             
-            on(modal.querySelector('#confirmAction'), 'click', function() {
+            bindClick(modal.querySelector('#confirmAction'), function() {
                 modal.remove();
                 resolve(true);
             });
@@ -398,7 +412,7 @@
             var confirmBtn = modal.querySelector('#resetConfirm');
             var cancelBtn = modal.querySelector('#resetCancel');
             
-            on(confirmBtn, 'click', function() {
+            bindClick(confirmBtn, function() {
                 var pass1 = newPassword.value;
                 var pass2 = confirmPassword.value;
                 
@@ -419,7 +433,7 @@
                 resolve(pass1);
             });
             
-            on(cancelBtn, 'click', function() {
+            bindClick(cancelBtn, function() {
                 modal.remove();
                 resolve(null);
             });
@@ -483,7 +497,7 @@
         }
         
         var closeBtn = modal.querySelector('.close-verification');
-        on(closeBtn, 'click', function() {
+        bindClick(closeBtn, function() {
             modal.remove();
             isVerifying = false;
             verificationDone = false;
@@ -492,7 +506,7 @@
         var form = $('verificationForm');
         var submitBtn = $('verifySubmitBtn');
         
-        on(form, 'submit', function(e) {
+        form.addEventListener('submit', function(e) {
             e.preventDefault();
             e.stopPropagation();
             if (verificationDone || isVerifying) return;
@@ -545,7 +559,7 @@
         });
         
         var resendBtn = $('resendCodeBtn');
-        on(resendBtn, 'click', function(e) {
+        bindClick(resendBtn, function(e) {
             e.preventDefault();
             verificationDone = false;
             isVerifying = false;
@@ -651,7 +665,7 @@
             bindPasswordToggles(authModal);
             
             forgotPasswordLink.style.display = 'block';
-            on(forgotPasswordBtn, 'click', function(e) {
+            bindClick(forgotPasswordBtn, function(e) {
                 e.preventDefault();
                 openModal('reset');
             });
@@ -695,7 +709,7 @@
         
         var switchLink = $('authSwitchLink');
         if (switchLink) {
-            on(switchLink, 'click', function(e) {
+            bindClick(switchLink, function(e) {
                 e.preventDefault();
                 if (mode === 'reset') {
                     openModal('login');
@@ -715,7 +729,7 @@
         var authBtn = $('authBtn');
         if (!authBtn) return;
         
-        on(authBtn, 'click', function() {
+        bindClick(authBtn, function() {
             if (isLoggedIn) {
                 toggleProfileMenu();
             } else {
@@ -732,7 +746,7 @@
         var authModal = $('authModal');
         
         if (closeAuthModal) {
-            on(closeAuthModal, 'click', function() {
+            bindClick(closeAuthModal, function() {
                 if (authModal) authModal.style.display = 'none';
             });
         }
@@ -748,7 +762,7 @@
         
         if (!authForm) return;
         
-        on(authForm, 'submit', function(e) {
+        authForm.addEventListener('submit', function(e) {
             e.preventDefault();
             e.stopPropagation();
             
@@ -901,7 +915,7 @@
     }
 
     // ============================================================
-    // PROFILE MENU - FIXED TO WORK ON MOBILE
+    // PROFILE MENU - COMPLETELY FIXED FOR MOBILE
     // ============================================================
     function toggleProfileMenu() {
         // Remove existing menu if open
@@ -920,49 +934,59 @@
         profileMenu = document.createElement('div');
         profileMenu.className = 'user-menu';
         profileMenu.id = 'profileMenu';
+        profileMenu.style.position = 'fixed';
+        profileMenu.style.zIndex = '10000';
+        profileMenu.style.minWidth = '220px';
+        profileMenu.style.maxWidth = 'calc(100% - 16px)';
+        profileMenu.style.background = 'var(--bg-card)';
+        profileMenu.style.borderRadius = 'var(--radius)';
+        profileMenu.style.boxShadow = 'var(--shadow-hover)';
+        profileMenu.style.border = '1px solid var(--border-color)';
+        profileMenu.style.overflow = 'hidden';
+        profileMenu.style.padding = '6px 0';
+        
         profileMenu.innerHTML = 
-            '<div class="user-menu-header">' +
-                '<i class="fas fa-user-circle"></i>' +
-                '<div>' +
-                    '<strong>' + currentUser.username + '</strong>' +
-                    '<small>' + currentUser.email + '</small>' +
+            '<div class="user-menu-header" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg-input);">' +
+                '<i class="fas fa-user-circle" style="font-size:1.8rem;color:var(--accent);"></i>' +
+                '<div style="display:flex;flex-direction:column;">' +
+                    '<strong style="color:var(--text-primary);font-size:0.9rem;">' + currentUser.username + '</strong>' +
+                    '<small style="color:var(--text-light);font-size:0.7rem;word-break:break-all;">' + currentUser.email + '</small>' +
                 '</div>' +
             '</div>' +
-            '<div class="user-menu-divider"></div>' +
-            '<div class="user-menu-item" data-action="profile"><i class="fas fa-user"></i> <span>Profile</span></div>' +
-            '<div class="user-menu-item" data-action="account"><i class="fas fa-cog"></i> <span>Account Settings</span></div>' +
-            '<div class="user-menu-divider"></div>' +
-            '<div class="user-menu-item logout" data-action="logout"><i class="fas fa-sign-out-alt"></i> <span>Log Out</span></div>';
+            '<div class="user-menu-divider" style="height:1px;background:var(--border-color);margin:4px 12px;"></div>' +
+            '<div class="user-menu-item" data-action="profile" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--text-secondary);transition:var(--transition);font-size:0.85rem;">' +
+                '<i class="fas fa-user"></i> <span>Profile</span>' +
+            '</div>' +
+            '<div class="user-menu-item" data-action="account" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--text-secondary);transition:var(--transition);font-size:0.85rem;">' +
+                '<i class="fas fa-cog"></i> <span>Account Settings</span>' +
+            '</div>' +
+            '<div class="user-menu-divider" style="height:1px;background:var(--border-color);margin:4px 12px;"></div>' +
+            '<div class="user-menu-item logout" data-action="logout" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--danger);transition:var(--transition);font-size:0.85rem;">' +
+                '<i class="fas fa-sign-out-alt"></i> <span>Log Out</span>' +
+            '</div>';
+        
         document.body.appendChild(profileMenu);
         
         // Position the menu
         var authBtn = $('authBtn');
         if (authBtn) {
             var rect = authBtn.getBoundingClientRect();
-            profileMenu.style.position = 'fixed';
             profileMenu.style.top = (rect.bottom + 8) + 'px';
             profileMenu.style.right = (window.innerWidth - rect.right) + 'px';
-            profileMenu.style.zIndex = '10000';
-            profileMenu.style.minWidth = '220px';
-            profileMenu.style.maxWidth = 'calc(100% - 16px)';
         } else {
-            profileMenu.style.position = 'fixed';
             profileMenu.style.top = '60px';
             profileMenu.style.right = '8px';
-            profileMenu.style.zIndex = '10000';
-            profileMenu.style.minWidth = '200px';
-            profileMenu.style.maxWidth = 'calc(100% - 16px)';
         }
         
-        // Add click events to menu items - FIXED for mobile
+        // Bind click events to menu items - DIRECT BINDING FOR MOBILE
         var items = profileMenu.querySelectorAll('.user-menu-item');
         for (var i = 0; i < items.length; i++) {
             (function(item) {
-                // Use both click and touch events
-                on(item, 'click', function(e) {
+                // DIRECT CLICK BINDING
+                item.addEventListener('click', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
-                    var action = this.dataset.action;
+                    var action = this.getAttribute('data-action');
                     var menu = document.getElementById('profileMenu');
                     if (menu) {
                         menu.remove();
@@ -976,31 +1000,42 @@
                         logoutUser();
                     }
                 });
+                
+                // DIRECT TOUCH BINDING FOR MOBILE
+                item.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var action = this.getAttribute('data-action');
+                    var menu = document.getElementById('profileMenu');
+                    if (menu) {
+                        menu.remove();
+                        profileMenu = null;
+                    }
+                    if (action === 'profile') {
+                        openProfileModal();
+                    } else if (action === 'account') {
+                        openAccountSettings();
+                    } else if (action === 'logout') {
+                        logoutUser();
+                    }
+                }, { passive: false });
             })(items[i]);
         }
         
         // Close menu when clicking outside
         setTimeout(function() {
-            document.addEventListener('click', function closeMenu(e) {
+            var closeHandler = function(e) {
                 var menu = document.getElementById('profileMenu');
                 var authBtnEl = $('authBtn');
                 if (menu && !menu.contains(e.target) && e.target !== authBtnEl) {
                     menu.remove();
                     profileMenu = null;
-                    document.removeEventListener('click', closeMenu);
+                    document.removeEventListener('click', closeHandler);
+                    document.removeEventListener('touchstart', closeHandler);
                 }
-            });
-            
-            // Also close on touch outside
-            document.addEventListener('touchstart', function closeMenuTouch(e) {
-                var menu = document.getElementById('profileMenu');
-                var authBtnEl = $('authBtn');
-                if (menu && !menu.contains(e.target) && e.target !== authBtnEl) {
-                    menu.remove();
-                    profileMenu = null;
-                    document.removeEventListener('touchstart', closeMenuTouch);
-                }
-            });
+            };
+            document.addEventListener('click', closeHandler);
+            document.addEventListener('touchstart', closeHandler);
         }, 100);
     }
 
@@ -1059,8 +1094,8 @@
             '</div>';
         document.body.appendChild(modal);
         
-        on(modal.querySelector('.close-profile'), 'click', function() { modal.remove(); });
-        on(modal.querySelector('#goToSettingsBtn'), 'click', function() {
+        bindClick(modal.querySelector('.close-profile'), function() { modal.remove(); });
+        bindClick(modal.querySelector('#goToSettingsBtn'), function() {
             modal.remove();
             openAccountSettings();
         });
@@ -1113,9 +1148,9 @@
         
         bindPasswordToggles(modal);
         
-        on(modal.querySelector('.close-settings'), 'click', function() { modal.remove(); });
+        bindClick(modal.querySelector('.close-settings'), function() { modal.remove(); });
         
-        on(modal.querySelector('#saveSettingsBtn'), 'click', function() {
+        bindClick(modal.querySelector('#saveSettingsBtn'), function() {
             var newEmail = $('settingsEmail').value;
             var currentPassword = $('settingsCurrentPassword').value;
             var newPassword = $('settingsNewPassword').value;
@@ -1210,7 +1245,7 @@
             modal.remove();
         });
         
-        on(modal.querySelector('#deleteAccountBtn'), 'click', function() {
+        bindClick(modal.querySelector('#deleteAccountBtn'), function() {
             showConfirmationModal(
                 'Delete Account',
                 'Are you sure? This cannot be undone.',
@@ -1263,7 +1298,7 @@
     function setupHistoryButton() {
         var historyNavBtn = $('historyNavBtn');
         if (historyNavBtn) {
-            on(historyNavBtn, 'click', function() {
+            bindClick(historyNavBtn, function() {
                 openHistoryModal();
             });
         }
@@ -1298,13 +1333,13 @@
             '</div>';
         document.body.appendChild(historyModal);
         
-        on(historyModal.querySelector('.close-history'), 'click', function() {
+        bindClick(historyModal.querySelector('.close-history'), function() {
             historyModal.style.display = 'none';
         });
         
         loadHistoryModal();
         
-        on(historyModal.querySelector('#deleteAllHistory'), 'click', function() {
+        bindClick(historyModal.querySelector('#deleteAllHistory'), function() {
             if (!isLoggedIn || !currentUser) {
                 showNotification('Please sign in.', 'warning');
                 return;
@@ -1356,7 +1391,7 @@
             var deleteBtns = historyList.querySelectorAll('.h-delete');
             for (var j = 0; j < deleteBtns.length; j++) {
                 (function(btn) {
-                    on(btn, 'click', function() {
+                    bindClick(btn, function() {
                         var id = this.dataset.id;
                         showConfirmationModal(
                             'Delete History',
@@ -1440,7 +1475,7 @@
         translateFromBtn.textContent = 'Translate from: ';
         translateFromContainer.appendChild(translateFromBtn);
 
-        on(translateFromBtn, 'click', function() {
+        bindClick(translateFromBtn, function() {
             var detectedLang = this.dataset.lang;
             if (detectedLang && detectedLang !== 'auto') {
                 if (sourceLang) sourceLang.value = detectedLang;
@@ -1466,7 +1501,7 @@
             inputBoxActions.appendChild(inputSpeakerBtn);
         }
 
-        on(inputSpeakerBtn, 'click', function() {
+        bindClick(inputSpeakerBtn, function() {
             var text = inputText ? inputText.value.trim() : '';
             if (text) {
                 stopSpeech();
@@ -1482,7 +1517,7 @@
         if (speakOutputBtn) {
             var newOutputSpeaker = speakOutputBtn.cloneNode(true);
             speakOutputBtn.parentNode.replaceChild(newOutputSpeaker, speakOutputBtn);
-            on(newOutputSpeaker, 'click', function() {
+            bindClick(newOutputSpeaker, function() {
                 var text = outputDisplay ? outputDisplay.textContent : '';
                 if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
                     stopSpeech();
@@ -1621,7 +1656,7 @@
         }
 
         // Event listeners
-        on(translateBtn, 'click', function() {
+        bindClick(translateBtn, function() {
             if (!isTranslating) {
                 performTranslation();
             }
@@ -1689,7 +1724,7 @@
             });
         }
 
-        on(swapBtn, 'click', function() {
+        bindClick(swapBtn, function() {
             stopRecordingIfActive();
             stopSpeech();
             var temp = sourceLang ? sourceLang.value : 'rw';
@@ -1704,7 +1739,7 @@
             resetTranslateFromBtn();
         });
 
-        on(copyOutputBtn, 'click', function() {
+        bindClick(copyOutputBtn, function() {
             var text = outputDisplay ? outputDisplay.textContent : '';
             if (text && !text.includes('placeholder') && !text.includes('Please enter') && !text.includes('Translating') && !text.includes('Error')) {
                 try {
@@ -1731,7 +1766,7 @@
             }
         });
 
-        on(clearInputBtn, 'click', function() {
+        bindClick(clearInputBtn, function() {
             stopRecordingIfActive();
             stopSpeech();
             if (inputText) inputText.value = '';
@@ -1929,7 +1964,7 @@
             
             initRecognition();
             
-            on(micBtn, 'click', function() {
+            bindClick(micBtn, function() {
                 if (isRecording) {
                     isRecording = false;
                     try {
@@ -2022,7 +2057,7 @@
     function setupThemeToggle() {
         var themeToggle = $('themeToggle');
         if (themeToggle) {
-            on(themeToggle, 'click', function() {
+            bindClick(themeToggle, function() {
                 var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
                 document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
                 this.innerHTML = isDark ? '<i class="fas fa-moon"></i> <span>Theme</span>' : '<i class="fas fa-sun"></i> <span>Theme</span>';
@@ -2045,13 +2080,13 @@
         var closeAboutModal = $('closeAboutModal');
         
         if (aboutNavBtn) {
-            on(aboutNavBtn, 'click', function() {
+            bindClick(aboutNavBtn, function() {
                 if (aboutModal) aboutModal.style.display = 'flex';
             });
         }
         
         if (closeAboutModal) {
-            on(closeAboutModal, 'click', function() {
+            bindClick(closeAboutModal, function() {
                 if (aboutModal) aboutModal.style.display = 'none';
             });
         }
