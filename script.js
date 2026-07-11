@@ -33,6 +33,8 @@
     var interimTranscript = '';
     var recordingTimeout = null;
     var currentRecordingLang = 'en';
+    var detectedLanguageCache = '';
+    var lastTranslationText = '';
 
     // ============================================================
     // LANGUAGE LIST
@@ -76,26 +78,9 @@
         return document.getElementById(id);
     }
 
-    // UNIVERSAL EVENT HANDLER - Works on all devices
-    function on(el, event, handler) {
-        if (!el) return;
-        if (event === 'click') {
-            el.addEventListener('click', handler);
-            el.addEventListener('touchstart', function(e) {
-                e.preventDefault();
-                handler(e);
-            }, { passive: false });
-        } else {
-            el.addEventListener(event, handler);
-        }
-    }
-
-    // DIRECT EVENT BINDING - For dynamically created elements
     function bindClick(el, handler) {
         if (!el) return;
-        // Click event
         el.addEventListener('click', handler);
-        // Touch event for mobile
         el.addEventListener('touchstart', function(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -237,9 +222,7 @@
             utterance.lang = lang || 'en';
             currentSpeech = utterance;
             window.speechSynthesis.speak(utterance);
-        } catch (e) {
-            // Silent fail
-        }
+        } catch (e) {}
     }
 
     function stopSpeech() {
@@ -342,6 +325,73 @@
             } finally {
                 isVerifying = false;
             }
+        });
+    }
+
+    // ============================================================
+    // CUSTOM PASSWORD PROMPT MODAL - REPLACES BROWSER PROMPT
+    // ============================================================
+    function showPasswordPromptModal(title, message, placeholder) {
+        placeholder = placeholder || 'Enter your password';
+        return new Promise(function(resolve) {
+            var modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.style.zIndex = '10001';
+            modal.innerHTML = 
+                '<div class="modal-content prompt-content" style="max-width: 420px;">' +
+                    '<h2 style="text-align: center; margin-bottom: 12px;">' + title + '</h2>' +
+                    '<p style="text-align: center; color: var(--text-secondary); margin-bottom: 16px;">' + message + '</p>' +
+                    '<div class="settings-field">' +
+                        '<label>Password</label>' +
+                        createPasswordField('promptPasswordInput', placeholder).outerHTML +
+                    '</div>' +
+                    '<div class="confirmation-buttons" style="margin-top: 16px;">' +
+                        '<button class="auth-submit-btn cancel-btn" id="promptCancel" style="flex:1;">Cancel</button>' +
+                        '<button class="auth-submit-btn delete-btn" id="promptConfirm" style="flex:1;">Confirm</button>' +
+                    '</div>' +
+                '</div>';
+            document.body.appendChild(modal);
+            
+            bindPasswordToggles(modal);
+            
+            var input = $('promptPasswordInput');
+            var confirmBtn = modal.querySelector('#promptConfirm');
+            var cancelBtn = modal.querySelector('#promptCancel');
+            
+            if (input) input.focus();
+            
+            bindClick(confirmBtn, function() {
+                var value = input ? input.value : '';
+                modal.remove();
+                resolve(value);
+            });
+            
+            bindClick(cancelBtn, function() {
+                modal.remove();
+                resolve(null);
+            });
+            
+            if (input) {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        var value = input.value;
+                        modal.remove();
+                        resolve(value);
+                    }
+                    if (e.key === 'Escape') {
+                        modal.remove();
+                        resolve(null);
+                    }
+                });
+            }
+            
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                    resolve(null);
+                }
+            });
         });
     }
 
@@ -578,7 +628,7 @@
     }
 
     // ============================================================
-    // AUTH STATE - History Tab Visibility Fixed
+    // AUTH STATE
     // ============================================================
     function checkAuthStatus() {
         var token = localStorage.getItem('authToken');
@@ -915,10 +965,9 @@
     }
 
     // ============================================================
-    // PROFILE MENU - COMPLETELY FIXED FOR MOBILE
+    // PROFILE MENU
     // ============================================================
     function toggleProfileMenu() {
-        // Remove existing menu if open
         if (profileMenu) {
             profileMenu.remove();
             profileMenu = null;
@@ -930,7 +979,6 @@
             return;
         }
         
-        // Create the profile menu
         profileMenu = document.createElement('div');
         profileMenu.className = 'user-menu';
         profileMenu.id = 'profileMenu';
@@ -967,7 +1015,6 @@
         
         document.body.appendChild(profileMenu);
         
-        // Position the menu
         var authBtn = $('authBtn');
         if (authBtn) {
             var rect = authBtn.getBoundingClientRect();
@@ -978,11 +1025,9 @@
             profileMenu.style.right = '8px';
         }
         
-        // Bind click events to menu items - DIRECT BINDING FOR MOBILE
         var items = profileMenu.querySelectorAll('.user-menu-item');
         for (var i = 0; i < items.length; i++) {
             (function(item) {
-                // DIRECT CLICK BINDING
                 item.addEventListener('click', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -1001,7 +1046,6 @@
                     }
                 });
                 
-                // DIRECT TOUCH BINDING FOR MOBILE
                 item.addEventListener('touchstart', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -1022,7 +1066,6 @@
             })(items[i]);
         }
         
-        // Close menu when clicking outside
         setTimeout(function() {
             var closeHandler = function(e) {
                 var menu = document.getElementById('profileMenu');
@@ -1102,7 +1145,7 @@
     }
 
     // ============================================================
-    // ACCOUNT SETTINGS
+    // ACCOUNT SETTINGS - FIXED DELETE ACCOUNT
     // ============================================================
     function openAccountSettings() {
         var user = DATA_MANAGER.getCurrentUser();
@@ -1245,47 +1288,63 @@
             modal.remove();
         });
         
+        // ============================================================
+        // DELETE ACCOUNT - FIXED: Uses custom modal instead of browser prompt
+        // ============================================================
         bindClick(modal.querySelector('#deleteAccountBtn'), function() {
             showConfirmationModal(
                 'Delete Account',
-                'Are you sure? This cannot be undone.',
+                'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.',
                 'Delete Account',
                 'Cancel'
             ).then(function(confirmed) {
                 if (!confirmed) return;
-                var password = prompt('Enter your password to confirm:');
-                if (password === null) return;
-                if (!password || password.trim() === '') {
-                    showNotification('Password is required.', 'error');
-                    return;
-                }
-                if (!DATA_MANAGER.verifyPassword(password, user.password)) {
-                    showNotification('Incorrect password.', 'error');
-                    return;
-                }
-                var deleteBtn = $('deleteAccountBtn');
-                var originalText = deleteBtn.textContent;
-                deleteBtn.textContent = 'Sending code...';
-                deleteBtn.disabled = true;
-                sendVerificationCode(user.email, 'delete').then(function(result) {
-                    if (!result.success) {
-                        showNotification('Error sending code.', 'error');
-                        deleteBtn.textContent = originalText;
-                        deleteBtn.disabled = false;
+                
+                // Use custom password prompt modal instead of browser prompt
+                showPasswordPromptModal(
+                    'Confirm Deletion',
+                    'Enter your password to confirm account deletion:',
+                    'Enter your password'
+                ).then(function(password) {
+                    if (password === null) {
+                        showNotification('Account deletion cancelled.', 'info');
                         return;
                     }
-                    deleteBtn.textContent = originalText;
-                    deleteBtn.disabled = false;
-                    openVerificationModal(user.email, 'delete', function(token) {
-                        var deleteResult = DATA_MANAGER.deleteAccount(user.id, password);
-                        if (deleteResult.success) {
-                            localStorage.removeItem('authToken');
-                            showNotification('Account deleted.', 'info');
-                            modal.remove();
-                            window.location.reload();
-                        } else {
-                            showNotification('Error deleting account.', 'error');
+                    if (!password || password.trim() === '') {
+                        showNotification('Password is required.', 'error');
+                        return;
+                    }
+                    if (!DATA_MANAGER.verifyPassword(password, user.password)) {
+                        showNotification('Incorrect password. Please try again.', 'error');
+                        return;
+                    }
+                    
+                    var deleteBtn = $('deleteAccountBtn');
+                    var originalText = deleteBtn.textContent;
+                    deleteBtn.textContent = 'Sending code...';
+                    deleteBtn.disabled = true;
+                    
+                    sendVerificationCode(user.email, 'delete').then(function(result) {
+                        if (!result.success) {
+                            showNotification('Error sending verification code.', 'error');
+                            deleteBtn.textContent = originalText;
+                            deleteBtn.disabled = false;
+                            return;
                         }
+                        deleteBtn.textContent = originalText;
+                        deleteBtn.disabled = false;
+                        
+                        openVerificationModal(user.email, 'delete', function(token) {
+                            var deleteResult = DATA_MANAGER.deleteAccount(user.id, password);
+                            if (deleteResult.success) {
+                                localStorage.removeItem('authToken');
+                                showNotification('Account deleted successfully.', 'success');
+                                modal.remove();
+                                window.location.reload();
+                            } else {
+                                showNotification('Error deleting account.', 'error');
+                            }
+                        });
                     });
                 });
             });
@@ -1293,7 +1352,7 @@
     }
 
     // ============================================================
-    // HISTORY MODAL - Only for Logged In Users
+    // HISTORY MODAL
     // ============================================================
     function setupHistoryButton() {
         var historyNavBtn = $('historyNavBtn');
@@ -1417,7 +1476,7 @@
     }
 
     // ============================================================
-    // SAVE TO HISTORY - Only for Logged In Users
+    // SAVE TO HISTORY
     // ============================================================
     function saveToHistory(original, translated, sourceLang, targetLang) {
         if (!isLoggedIn || !currentUser) {
@@ -1433,7 +1492,7 @@
     }
 
     // ============================================================
-    // TRANSLATION ENGINE
+    // TRANSLATION ENGINE - FIXED LANGUAGE DETECTION
     // ============================================================
     function setupTranslation() {
         var sourceLang = $('sourceLang');
@@ -1451,6 +1510,7 @@
         finalTranscript = '';
         interimTranscript = '';
         currentRecordingLang = sourceLang ? sourceLang.value || 'en' : 'en';
+        detectedLanguageCache = '';
         
         // Create Translate From Container
         translateFromContainer = document.createElement('div');
@@ -1469,25 +1529,59 @@
             }
         }
 
-        // Create Translate From Button
+        // Create Translate From Button - FIXED CLICK HANDLING
         translateFromBtn = document.createElement('button');
         translateFromBtn.className = 'translate-from-btn';
         translateFromBtn.textContent = 'Translate from: ';
         translateFromContainer.appendChild(translateFromBtn);
 
-        bindClick(translateFromBtn, function() {
-            var detectedLang = this.dataset.lang;
-            if (detectedLang && detectedLang !== 'auto') {
-                if (sourceLang) sourceLang.value = detectedLang;
+        // FIXED: Proper click/touch handling for Translate From button
+        translateFromBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var detectedLang = this.getAttribute('data-lang');
+            if (detectedLang && detectedLang !== 'auto' && detectedLang !== '') {
+                if (sourceLang) {
+                    sourceLang.value = detectedLang;
+                    // Trigger change event
+                    var evt = document.createEvent('HTMLEvents');
+                    evt.initEvent('change', false, true);
+                    sourceLang.dispatchEvent(evt);
+                }
                 translateFromContainer.style.display = 'none';
-                this.dataset.lang = '';
+                this.setAttribute('data-lang', '');
+                this.textContent = 'Translate from: ';
                 var text = inputText ? inputText.value.trim() : '';
                 if (text) {
                     performTranslation();
                 }
-                showNotification('Switched to: ' + getLanguageName(detectedLang), 'success', 2000);
+                var langName = getLanguageName(detectedLang);
+                showNotification('Switched to: ' + langName, 'success', 2000);
             }
         });
+        
+        translateFromBtn.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var detectedLang = this.getAttribute('data-lang');
+            if (detectedLang && detectedLang !== 'auto' && detectedLang !== '') {
+                if (sourceLang) {
+                    sourceLang.value = detectedLang;
+                    var evt = document.createEvent('HTMLEvents');
+                    evt.initEvent('change', false, true);
+                    sourceLang.dispatchEvent(evt);
+                }
+                translateFromContainer.style.display = 'none';
+                this.setAttribute('data-lang', '');
+                this.textContent = 'Translate from: ';
+                var text = inputText ? inputText.value.trim() : '';
+                if (text) {
+                    performTranslation();
+                }
+                var langName = getLanguageName(detectedLang);
+                showNotification('Switched to: ' + langName, 'success', 2000);
+            }
+        }, { passive: false });
 
         // Add Speaker Icon to Input Field
         var inputSpeakerBtn = document.createElement('button');
@@ -1527,42 +1621,58 @@
             });
         }
 
-        // Translation functions
+        // ============================================================
+        // FIXED: LANGUAGE DETECTION - Like Google Translate
+        // ============================================================
         function updateTranslateFromBtn(detectedLang, text) {
             if (!text || text.length < 2 || isRecording) {
                 translateFromContainer.style.display = 'none';
-                translateFromBtn.dataset.lang = '';
+                translateFromBtn.setAttribute('data-lang', '');
+                translateFromBtn.textContent = 'Translate from: ';
                 return;
             }
+            
             var selectedLang = sourceLang ? sourceLang.value : 'en';
+            
+            // If detected language is same as selected, hide the button
             if (detectedLang && detectedLang !== 'auto' && detectedLang !== selectedLang) {
                 var langName = getLanguageName(detectedLang);
                 translateFromBtn.textContent = 'Translate from: ' + langName;
-                translateFromBtn.dataset.lang = detectedLang;
+                translateFromBtn.setAttribute('data-lang', detectedLang);
                 translateFromContainer.style.display = 'block';
             } else {
                 translateFromContainer.style.display = 'none';
-                translateFromBtn.dataset.lang = '';
+                translateFromBtn.setAttribute('data-lang', '');
+                translateFromBtn.textContent = 'Translate from: ';
             }
         }
 
         function resetTranslateFromBtn() {
             translateFromContainer.style.display = 'none';
-            translateFromBtn.dataset.lang = '';
+            translateFromBtn.setAttribute('data-lang', '');
+            translateFromBtn.textContent = 'Translate from: ';
         }
 
+        // FIXED: Better language detection for mixed languages
         function detectLanguage(text) {
             return new Promise(function(resolve) {
                 if (!text || text.length < 3) {
                     resolve('en');
                     return;
                 }
+                
+                // Check if text is mostly in a specific language using Google Translate API
                 var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + encodeURIComponent(text);
                 fetch(url).then(function(response) {
                     return response.json();
                 }).then(function(data) {
                     if (data && data[2]) {
-                        resolve(data[2]);
+                        var detected = data[2];
+                        // If detected language is different from selected, update button
+                        if (detected && detected !== 'auto') {
+                            detectedLanguageCache = detected;
+                        }
+                        resolve(detected);
                     } else {
                         resolve('en');
                     }
@@ -1597,6 +1707,7 @@
             });
         }
 
+        // FIXED: Translation with proper language detection
         function performTranslation() {
             var text = inputText ? inputText.value.trim() : '';
             if (!text) {
@@ -1608,6 +1719,7 @@
                 resetTranslateFromBtn();
                 return;
             }
+            
             if (isTranslating) {
                 translateQueue = true;
                 return;
@@ -1622,12 +1734,17 @@
             var sourceLangCode = sourceLang ? sourceLang.value : 'en';
             var targetLangCode = targetLang ? targetLang.value : 'en';
             
+            // First detect language
             detectLanguage(text).then(function(detectedLang) {
+                // Update the "Translate from" button with detected language
                 if (!isRecording && detectedLang && detectedLang !== 'auto') {
                     updateTranslateFromBtn(detectedLang, text);
                 } else {
                     resetTranslateFromBtn();
                 }
+                
+                // If detected language is different from selected, we still use selected for translation
+                // This is how Google Translate works - it detects but translates from selected
                 return translateText(text, sourceLangCode, targetLangCode);
             }).then(function(translated) {
                 if (outputDisplay) outputDisplay.textContent = translated;
