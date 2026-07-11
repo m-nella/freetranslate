@@ -2264,35 +2264,34 @@
     }
 
     // ============================================================
-    // ABOUT MODAL - FIXED: Navigation button text
-    // ============================================================
-    function setupAboutModal() {
-        var aboutNavBtn = $('aboutNavBtn');
-        var aboutModal = $('aboutModal');
-        var closeAboutModal = $('closeAboutModal');
-        
-        if (aboutNavBtn) {
-            // Ensure button has text
-            aboutNavBtn.innerHTML = '<i class="fas fa-info-circle"></i> <span>About</span>';
-            bindClick(aboutNavBtn, function() {
-                if (aboutModal) aboutModal.style.display = 'flex';
-            });
-        }
-        
-        if (closeAboutModal) {
-            bindClick(closeAboutModal, function() {
-                if (aboutModal) aboutModal.style.display = 'none';
-            });
-        }
-        
-        if (aboutModal) {
-            aboutModal.addEventListener('click', function(e) {
-                if (e.target === aboutModal) {
-                    aboutModal.style.display = 'none';
-                }
-            });
-        }
+// ABOUT MODAL - FIXED: Navigation button text
+// ============================================================
+function setupAboutModal() {
+    var aboutNavBtn = $('aboutNavBtn');
+    var aboutModal = $('aboutModal');
+    var closeAboutModal = $('closeAboutModal');
+    
+    if (aboutNavBtn) {
+        // Don't reset innerHTML - it already has the correct content
+        bindClick(aboutNavBtn, function() {
+            if (aboutModal) aboutModal.style.display = 'flex';
+        });
     }
+    
+    if (closeAboutModal) {
+        bindClick(closeAboutModal, function() {
+            if (aboutModal) aboutModal.style.display = 'none';
+        });
+    }
+    
+    if (aboutModal) {
+        aboutModal.addEventListener('click', function(e) {
+            if (e.target === aboutModal) {
+                aboutModal.style.display = 'none';
+            }
+        });
+    }
+}
 
     // ============================================================
     // INITIALIZATION
