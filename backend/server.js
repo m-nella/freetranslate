@@ -44,7 +44,7 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // ============================================================
-// 3. DATABASE CONNECTION - FIXED
+// 3. DATABASE CONNECTION
 // ============================================================
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
@@ -52,12 +52,7 @@ if (!MONGODB_URI) {
     process.exit(1);
 }
 
-mongoose.connect(MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
-}).then(() => {
+mongoose.connect(MONGODB_URI).then(() => {
     console.log('✅ MongoDB Atlas connected successfully!');
 }).catch((err) => {
     console.error('❌ MongoDB connection error:', err);
@@ -131,6 +126,10 @@ const UserSchema = new mongoose.Schema({
     lastLogin: {
         type: Date,
         default: null
+    },
+    isVerified: {
+        type: Boolean,
+        default: false
     }
 });
 
@@ -263,14 +262,14 @@ function comparePassword(password, hash) {
     });
 }
 
-// Generate username from email
+// Generate username from email - SHORT and CLEAN
 function generateUsernameFromEmail(email) {
     if (!email) return 'user';
     var localPart = email.split('@')[0];
     var clean = localPart.replace(/[^a-zA-Z0-9]/g, '');
     if (!clean) return 'user';
-    if (clean.length > 12) {
-        clean = clean.substring(0, 12);
+    if (clean.length > 8) {
+        clean = clean.substring(0, 8);
     }
     if (clean.length < 3) {
         var random = Math.random().toString(36).substring(2, 5);
@@ -441,7 +440,7 @@ function authMiddleware(req, res, next) {
 // 7. AUTH APIs
 // ============================================================
 
-// POST /api/auth/signup - FIXED with username generation
+// POST /api/auth/signup
 app.post('/api/auth/signup', async (req, res) => {
     try {
         const { email, password, username } = req.body;
@@ -450,37 +449,30 @@ app.post('/api/auth/signup', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email and password are required.' });
         }
 
-        // Check if user exists
         const existingUser = await User.findOne({ email: email.toLowerCase() });
         if (existingUser) {
             return res.status(400).json({ success: false, message: 'Email already registered. Please sign in.' });
         }
 
-        // Generate username if not provided or invalid
         let finalUsername = username;
         if (!finalUsername || finalUsername.length < 2) {
             finalUsername = generateUsernameFromEmail(email);
         }
 
-        // Hash password
         const passwordHash = await hashPassword(password);
 
-        // Create user
         const user = new User({
             username: finalUsername,
             email: email.toLowerCase(),
-            passwordHash: passwordHash
+            passwordHash: passwordHash,
+            isVerified: false
         });
 
         await user.save();
 
-        // Generate token
-        const token = generateToken(user._id);
-
         res.status(201).json({
             success: true,
-            message: 'Account created successfully. Please verify your email.',
-            token: token,
+            message: 'Account created successfully. Please verify your email to sign in.',
             data: {
                 id: user._id,
                 username: user.username,
@@ -507,6 +499,14 @@ app.post('/api/auth/signin', async (req, res) => {
         const user = await User.findOne({ email: email.toLowerCase() });
         if (!user) {
             return res.status(401).json({ success: false, message: 'Account not found. Please create an account.' });
+        }
+
+        if (!user.isVerified) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Please verify your email first. Check your email for verification code.',
+                requiresVerification: true
+            });
         }
 
         if (!user.passwordHash) {
@@ -580,7 +580,8 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
                 autoDetect: user.autoDetect,
                 notificationSettings: user.notificationSettings,
                 createdAt: user.createdAt,
-                lastLogin: user.lastLogin
+                lastLogin: user.lastLogin,
+                isVerified: user.isVerified
             }
         });
 
@@ -594,17 +595,16 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 // 8. USER APIs
 // ============================================================
 
-// PUT /api/user/profile
+// PUT /api/user/profile - ONLY FOR PHOTO AND SETTINGS, NOT USERNAME/EMAIL
 app.put('/api/user/profile', authMiddleware, async (req, res) => {
     try {
-        const { username, photo, theme, preferredSourceLanguage, preferredTargetLanguage, voiceSpeed, voicePitch, autoDetect, notificationSettings } = req.body;
+        const { photo, theme, preferredSourceLanguage, preferredTargetLanguage, voiceSpeed, voicePitch, autoDetect, notificationSettings } = req.body;
 
         const user = await User.findById(req.userId);
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        if (username) user.username = username;
         if (photo !== undefined) user.photo = photo;
         if (theme) user.theme = theme;
         if (preferredSourceLanguage) user.preferredSourceLanguage = preferredSourceLanguage;
@@ -673,7 +673,7 @@ app.put('/api/user/change-password', authMiddleware, async (req, res) => {
     }
 });
 
-// PUT /api/user/change-email
+// PUT /api/user/change-email - Auto-updates username
 app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     try {
         const { newEmail, password } = req.body;
@@ -697,11 +697,21 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email already in use.' });
         }
 
+        // Update email and auto-generate new username from new email
         user.email = newEmail.toLowerCase();
+        user.username = generateUsernameFromEmail(newEmail);
         user.updatedAt = new Date();
+        user.isVerified = false; // Require re-verification
         await user.save();
 
-        res.json({ success: true, message: 'Email updated successfully.' });
+        res.json({ 
+            success: true, 
+            message: 'Email updated successfully. Please verify your new email.',
+            data: {
+                email: user.email,
+                username: user.username
+            }
+        });
 
     } catch (error) {
         console.error('Change email error:', error);
@@ -709,7 +719,7 @@ app.put('/api/user/change-email', authMiddleware, async (req, res) => {
     }
 });
 
-// DELETE /api/user/delete - FIXED
+// DELETE /api/user/delete
 app.delete('/api/user/delete', authMiddleware, async (req, res) => {
     try {
         const { password } = req.body;
@@ -734,7 +744,6 @@ app.delete('/api/user/delete', authMiddleware, async (req, res) => {
         }
 
         await History.deleteMany({ userId: req.userId });
-
         await User.findByIdAndDelete(req.userId);
 
         res.json({ success: true, message: 'Account deleted successfully.' });
@@ -929,10 +938,20 @@ app.post('/api/verify/check-code', async (req, res) => {
         verification.isUsed = true;
         await verification.save();
 
-        let token = null;
-        if (action === 'signup' || action === 'signin') {
+        // Mark user as verified for signup action
+        if (action === 'signup') {
             const user = await User.findOne({ email: email.toLowerCase() });
             if (user) {
+                user.isVerified = true;
+                await user.save();
+            }
+        }
+
+        // Generate token for signin action only
+        let token = null;
+        if (action === 'signin') {
+            const user = await User.findOne({ email: email.toLowerCase() });
+            if (user && user.isVerified) {
                 token = generateToken(user._id);
             }
         }
@@ -940,7 +959,8 @@ app.post('/api/verify/check-code', async (req, res) => {
         res.json({ 
             success: true, 
             message: 'Code verified successfully.',
-            token: token
+            token: token,
+            requiresSignIn: action === 'signup'
         });
 
     } catch (error) {
