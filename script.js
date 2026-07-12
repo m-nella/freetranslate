@@ -132,17 +132,12 @@
     // ============================================================
     function generateUsernameFromEmail(email) {
         if (!email) return 'user';
-        // Get part before @
         var localPart = email.split('@')[0];
-        // Remove dots and special characters
         var clean = localPart.replace(/[^a-zA-Z0-9]/g, '');
-        // If empty after cleaning, use default
         if (!clean) return 'user';
-        // If too long, truncate to 12 chars
         if (clean.length > 12) {
             clean = clean.substring(0, 12);
         }
-        // If too short, pad with random chars
         if (clean.length < 3) {
             var random = Math.random().toString(36).substring(2, 5);
             clean = clean + random;
@@ -347,7 +342,7 @@
     }
 
     // ============================================================
-    // VERIFY CODE - UPDATED to use API - FIXED
+    // VERIFY CODE - UPDATED to use API
     // ============================================================
     function verifyCode(email, code) {
         isVerifying = true;
@@ -546,7 +541,7 @@
     }
 
     // ============================================================
-    // VERIFICATION MODAL - FIXED
+    // VERIFICATION MODAL
     // ============================================================
     function openVerificationModal(email, action, callback) {
         pendingEmail = email;
@@ -711,7 +706,7 @@
                 currentUser = {
                     id: user._id || user.id,
                     email: user.email,
-                    username: user.username,
+                    username: user.username || generateUsernameFromEmail(user.email),
                     createdAt: user.createdAt,
                     lastLogin: user.lastLogin
                 };
@@ -778,7 +773,7 @@
                     currentUser = {
                         id: user._id || user.id,
                         email: user.email,
-                        username: user.username,
+                        username: user.username || generateUsernameFromEmail(user.email),
                         createdAt: user.createdAt,
                         lastLogin: user.lastLogin
                     };
@@ -1058,7 +1053,6 @@
                 
             } else if (currentMode === 'signup') {
                 var confirmPassword = $('authConfirmPassword') ? $('authConfirmPassword').value : '';
-                // FIX: Generate username from email
                 var username = generateUsernameFromEmail(email);
                 
                 if (password !== confirmPassword) {
@@ -1506,8 +1500,6 @@
                         return;
                     }
                     
-                    // FIX: Directly call delete without verification code
-                    // Since we already have the password, we don't need email verification for deletion
                     showNotification('Deleting account...', 'info');
                     
                     API_MANAGER.deleteAccount(password).then(function(response) {
@@ -1517,7 +1509,6 @@
                             localStorage.removeItem('cachedHistory');
                             showNotification('Account deleted successfully.', 'success');
                             modal.remove();
-                            // Reset UI
                             isLoggedIn = false;
                             currentUser = null;
                             var authBtn = $('authBtn');
