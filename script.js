@@ -317,7 +317,7 @@
     }
 
     // ============================================================
-    // VERIFICATION CODE SYSTEM - UPDATED to use API
+    // VERIFICATION CODE SYSTEM
     // ============================================================
     function sendVerificationCode(email, action) {
         return new Promise(function(resolve, reject) {
@@ -343,7 +343,7 @@
     }
 
     // ============================================================
-    // VERIFY CODE - UPDATED to use API
+    // VERIFY CODE
     // ============================================================
     function verifyCode(email, code) {
         isVerifying = true;
@@ -546,7 +546,7 @@
     }
 
     // ============================================================
-    // VERIFICATION MODAL - FIXED
+    // VERIFICATION MODAL
     // ============================================================
     function openVerificationModal(email, action, callback) {
         pendingEmail = email;
@@ -646,25 +646,25 @@
                         if (typeof pendingCallback === 'function') {
                             pendingCallback(result, code);
                         }
-                        // For signup, redirect to sign in with refresh
                         if (action === 'signup') {
                             showNotification('Email verified! Please sign in.', 'success');
                             setTimeout(function() {
                                 window.location.reload();
                             }, 500);
                         } else if (action === 'signin') {
-                            // Signin successful, check auth status
                             checkAuthStatus();
                         } else if (action === 'email') {
                             showNotification('Email updated successfully!', 'success');
-                            window.location.reload();
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 500);
                         } else if (action === 'password') {
                             showNotification('Password updated successfully!', 'success');
-                            window.location.reload();
-                        } else if (action === 'delete') {
-                            // Deletion handled separately
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 500);
                         } else if (action === 'reset') {
-                            // Reset handled separately
+                            // Reset handled in callback
                         } else {
                             checkAuthStatus();
                         }
@@ -993,7 +993,7 @@
             var password = $('authPassword') ? $('authPassword').value : '';
             
             // ============================================================
-            // SIGN IN - FIXED: Verify credentials first, then require verification
+            // SIGN IN
             // ============================================================
             if (currentMode === 'login') {
                 authSubmitBtn.disabled = true;
@@ -1022,7 +1022,6 @@
                             authSubmitBtn.textContent = 'Sign In';
                         }
                     } else {
-                        // Check if user needs verification (password was correct)
                         if (response.requiresVerification) {
                             showNotification('Please verify your identity. Code sent!', 'warning');
                             if (authModal) authModal.style.display = 'none';
@@ -1042,7 +1041,6 @@
                             return;
                         }
                         
-                        // Account not found
                         if (response.message && response.message.toLowerCase().includes('account not found')) {
                             showNotification('Account not found. Please create an account.', 'error');
                             authSubmitBtn.disabled = false;
@@ -1058,7 +1056,6 @@
                         }
                     }
                 }).catch(function(error) {
-                    // Account not found
                     if (error.status === 404) {
                         showNotification('Account not found. Please create an account.', 'error');
                         authSubmitBtn.disabled = false;
@@ -1067,9 +1064,7 @@
                             if (authModal) authModal.style.display = 'none';
                             openModal('signup');
                         }, 1500);
-                    } 
-                    // Requires verification
-                    else if (error.data && error.data.requiresVerification) {
+                    } else if (error.data && error.data.requiresVerification) {
                         showNotification('Please verify your identity. Code sent!', 'warning');
                         if (authModal) authModal.style.display = 'none';
                         sendVerificationCode(email, 'signin').then(function(codeResult) {
@@ -1085,15 +1080,11 @@
                         });
                         authSubmitBtn.disabled = false;
                         authSubmitBtn.textContent = 'Sign In';
-                    }
-                    // Incorrect password
-                    else if (error.status === 401) {
+                    } else if (error.status === 401) {
                         showNotification('Incorrect password. Please try again.', 'error');
                         authSubmitBtn.disabled = false;
                         authSubmitBtn.textContent = 'Sign In';
-                    }
-                    // Other errors - try localStorage fallback
-                    else {
+                    } else {
                         var result = DATA_MANAGER.login(email, password);
                         if (result.success) {
                             sendVerificationCode(email, 'signin').then(function(codeResult) {
@@ -1130,7 +1121,7 @@
                 });
                 
             // ============================================================
-            // RESET PASSWORD - FIXED: Verify email exists, then send code
+            // RESET PASSWORD
             // ============================================================
             } else if (currentMode === 'reset') {
                 authSubmitBtn.disabled = true;
@@ -1186,7 +1177,7 @@
                 });
                 
             // ============================================================
-            // SIGN UP - FIXED: Create account, send code, verify, refresh
+            // SIGN UP
             // ============================================================
             } else if (currentMode === 'signup') {
                 var confirmPassword = $('authConfirmPassword') ? $('authConfirmPassword').value : '';
@@ -1472,7 +1463,7 @@
     }
 
     // ============================================================
-    // ACCOUNT SETTINGS - COMPLETE FIXED
+    // ACCOUNT SETTINGS - COMPLETE FIXED with verifyPassword endpoint
     // ============================================================
     function openAccountSettings() {
         var user = currentUser || DATA_MANAGER.getCurrentUser();
@@ -1525,7 +1516,7 @@
         var deleteBtn = modal.querySelector('#deleteAccountBtn');
         
         // ============================================================
-        // CHANGE EMAIL - FIXED: Verify new email different, password correct
+        // CHANGE EMAIL - FIXED: Uses verifyPassword endpoint
         // ============================================================
         bindClick(saveBtn, function() {
             var newEmail = $('settingsEmail').value;
@@ -1548,18 +1539,19 @@
                 }
                 
                 saveBtn.disabled = true;
-                saveBtn.textContent = 'Checking email...';
+                saveBtn.textContent = 'Verifying password...';
                 
-                // First verify current password is correct
-                API_MANAGER.signin(user.email, currentPassword).then(function(loginResult) {
-                    if (!loginResult.success && loginResult.message && loginResult.message.toLowerCase().includes('incorrect password')) {
+                // STEP 1: Verify current password using dedicated endpoint
+                API_MANAGER.verifyPassword(currentPassword).then(function(verifyResult) {
+                    if (!verifyResult.success) {
                         showNotification('Current password is incorrect.', 'error');
                         saveBtn.disabled = false;
                         saveBtn.textContent = 'Save Changes';
                         return;
                     }
                     
-                    // Check if new email already exists
+                    // STEP 2: Check if new email already exists
+                    saveBtn.textContent = 'Checking email...';
                     API_MANAGER.checkEmailExists(newEmail).then(function(checkResult) {
                         if (checkResult.success) {
                             showNotification('Email already registered. Please use a different email.', 'error');
@@ -1568,6 +1560,7 @@
                             return;
                         }
                         
+                        // STEP 3: Send verification code
                         saveBtn.textContent = 'Sending verification code...';
                         sendVerificationCode(newEmail, 'email').then(function(result) {
                             if (!result.success) {
@@ -1577,8 +1570,10 @@
                                 return;
                             }
                             
+                            // STEP 4: Open verification modal
                             openVerificationModal(newEmail, 'email', function(verifyResult, code) {
                                 if (verifyResult.success) {
+                                    // STEP 5: Update email
                                     saveBtn.textContent = 'Updating email...';
                                     API_MANAGER.changeEmail(newEmail, currentPassword, code).then(function(response) {
                                         if (response.success) {
@@ -1616,7 +1611,7 @@
                         });
                     }).catch(function(error) {
                         if (error.status === 404) {
-                            // Email not found, which is good for new email
+                            // Email not found - this is good for new email
                             saveBtn.textContent = 'Sending verification code...';
                             sendVerificationCode(newEmail, 'email').then(function(result) {
                                 if (!result.success) {
@@ -1678,7 +1673,7 @@
             }
             
             // ============================================================
-            // CHANGE PASSWORD - FIXED: Verify current password correct, new different
+            // CHANGE PASSWORD - FIXED: Uses verifyPassword endpoint
             // ============================================================
             if (newPassword || confirmPassword) {
                 if (newPassword !== confirmPassword) {
@@ -1702,15 +1697,16 @@
                 saveBtn.disabled = true;
                 saveBtn.textContent = 'Verifying current password...';
                 
-                // First verify current password is correct
-                API_MANAGER.signin(user.email, currentPassword).then(function(loginResult) {
-                    if (!loginResult.success && loginResult.message && loginResult.message.toLowerCase().includes('incorrect password')) {
+                // STEP 1: Verify current password using dedicated endpoint
+                API_MANAGER.verifyPassword(currentPassword).then(function(verifyResult) {
+                    if (!verifyResult.success) {
                         showNotification('Current password is incorrect.', 'error');
                         saveBtn.disabled = false;
                         saveBtn.textContent = 'Save Changes';
                         return;
                     }
                     
+                    // STEP 2: Send verification code
                     saveBtn.textContent = 'Sending verification code...';
                     sendVerificationCode(user.email, 'password').then(function(result) {
                         if (!result.success) {
@@ -1720,8 +1716,10 @@
                             return;
                         }
                         
+                        // STEP 3: Open verification modal
                         openVerificationModal(user.email, 'password', function(verifyResult, code) {
                             if (verifyResult.success) {
+                                // STEP 4: Update password
                                 saveBtn.textContent = 'Updating password...';
                                 API_MANAGER.changePassword(currentPassword, newPassword, code).then(function(response) {
                                     if (response.success) {
@@ -1762,7 +1760,7 @@
         });
         
         // ============================================================
-        // DELETE ACCOUNT - FIXED: Verify password first
+        // DELETE ACCOUNT - FIXED: Uses verifyPassword endpoint
         // ============================================================
         bindClick(deleteBtn, function() {
             showConfirmationModal(
@@ -1790,15 +1788,16 @@
                     deleteBtn.disabled = true;
                     deleteBtn.textContent = 'Verifying password...';
                     
-                    // First verify password is correct
-                    API_MANAGER.signin(user.email, password).then(function(loginResult) {
-                        if (!loginResult.success && loginResult.message && loginResult.message.toLowerCase().includes('incorrect password')) {
+                    // STEP 1: Verify password using dedicated endpoint
+                    API_MANAGER.verifyPassword(password).then(function(verifyResult) {
+                        if (!verifyResult.success) {
                             showNotification('Password is incorrect.', 'error');
                             deleteBtn.disabled = false;
                             deleteBtn.textContent = 'Delete Account';
                             return;
                         }
                         
+                        // STEP 2: Send verification code
                         deleteBtn.textContent = 'Sending verification code...';
                         sendVerificationCode(user.email, 'delete').then(function(result) {
                             if (!result.success) {
@@ -1808,9 +1807,11 @@
                                 return;
                             }
                             
+                            // STEP 3: Open verification modal
                             deleteBtn.textContent = 'Verifying...';
                             openVerificationModal(user.email, 'delete', function(verifyResult, code) {
                                 if (verifyResult.success) {
+                                    // STEP 4: Delete account
                                     deleteBtn.textContent = 'Deleting account...';
                                     API_MANAGER.deleteAccount(password, code).then(function(response) {
                                         if (response.success) {
