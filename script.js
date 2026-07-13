@@ -195,7 +195,7 @@
     }
 
     // ============================================================
-    // NOTIFICATION SYSTEM - FIXED with clear messages
+    // NOTIFICATION SYSTEM
     // ============================================================
     function showNotification(message, type, duration) {
         type = type || 'info';
@@ -543,7 +543,7 @@
     }
 
     // ============================================================
-    // VERIFICATION MODAL - FIXED
+    // VERIFICATION MODAL
     // ============================================================
     function openVerificationModal(email, action, callback) {
         pendingEmail = email;
@@ -860,7 +860,6 @@
             email.placeholder = 'Email address';
             email.required = true;
             email.style.marginBottom = '12px';
-            // DO NOT set value - no auto-fill
             authFields.appendChild(email);
             
             var passwordWrapper = createPasswordField('authPassword', 'Password');
@@ -884,7 +883,6 @@
             email.id = 'authEmail';
             email.placeholder = 'Email address';
             email.required = true;
-            // DO NOT set value - no auto-fill
             authFields.appendChild(email);
             forgotPasswordLink.style.display = 'none';
             
@@ -899,7 +897,6 @@
             email.placeholder = 'Email address';
             email.required = true;
             email.style.marginBottom = '12px';
-            // DO NOT set value - no auto-fill
             authFields.appendChild(email);
             
             var password = createPasswordField('authPassword', 'Password (min 8 chars)');
@@ -986,28 +983,9 @@
             if (currentMode === 'login') {
                 authSubmitBtn.disabled = true;
                 authSubmitBtn.textContent = 'Signing in...';
-                
+
                 API_MANAGER.signin(email, password).then(function(response) {
                     if (response.success) {
-                        if (response.requiresVerification) {
-                            showNotification('Please verify your email. Code sent!', 'warning');
-                            if (authModal) authModal.style.display = 'none';
-                            sendVerificationCode(email, 'signin').then(function(codeResult) {
-                                if (codeResult.success) {
-                                    openVerificationModal(email, 'signin', function(result) {
-                                        if (result.success && result.token) {
-                                            API_MANAGER.setToken(result.token);
-                                            showNotification('Signed in successfully!', 'success');
-                                            checkAuthStatus();
-                                        }
-                                    });
-                                }
-                            });
-                            authSubmitBtn.disabled = false;
-                            authSubmitBtn.textContent = 'Sign In';
-                            return;
-                        }
-                        
                         if (response.token) {
                             API_MANAGER.setToken(response.token);
                             API_MANAGER.fullSync().then(function(data) {
@@ -1029,17 +1007,8 @@
                             authSubmitBtn.textContent = 'Sign In';
                         }
                     } else {
-                        // Check if account not found
-                        if (response.message && response.message.toLowerCase().includes('account not found')) {
-                            showNotification('Account not found. Please create an account.', 'error');
-                            authSubmitBtn.disabled = false;
-                            authSubmitBtn.textContent = 'Sign In';
-                            setTimeout(function() { 
-                                if (authModal) authModal.style.display = 'none';
-                                openModal('signup');
-                            }, 1500);
-                        } else if (response.message && response.message.toLowerCase().includes('verify your email')) {
-                            // User exists but not verified - send code
+                        // Check if user needs verification (unverified account)
+                        if (response.requiresVerification) {
                             showNotification('Please verify your email. Code sent!', 'warning');
                             if (authModal) authModal.style.display = 'none';
                             sendVerificationCode(email, 'signin').then(function(codeResult) {
@@ -1055,6 +1024,18 @@
                             });
                             authSubmitBtn.disabled = false;
                             authSubmitBtn.textContent = 'Sign In';
+                            return;
+                        }
+                        
+                        // Check if account not found
+                        if (response.message && response.message.toLowerCase().includes('account not found')) {
+                            showNotification('Account not found. Please create an account.', 'error');
+                            authSubmitBtn.disabled = false;
+                            authSubmitBtn.textContent = 'Sign In';
+                            setTimeout(function() { 
+                                if (authModal) authModal.style.display = 'none';
+                                openModal('signup');
+                            }, 1500);
                         } else {
                             showNotification(response.message || 'Sign in failed. Please try again.', 'error');
                             authSubmitBtn.disabled = false;
@@ -1071,6 +1052,23 @@
                             if (authModal) authModal.style.display = 'none';
                             openModal('signup');
                         }, 1500);
+                    } else if (error.data && error.data.requiresVerification) {
+                        // User exists but not verified
+                        showNotification('Please verify your email. Code sent!', 'warning');
+                        if (authModal) authModal.style.display = 'none';
+                        sendVerificationCode(email, 'signin').then(function(codeResult) {
+                            if (codeResult.success) {
+                                openVerificationModal(email, 'signin', function(result) {
+                                    if (result.success && result.token) {
+                                        API_MANAGER.setToken(result.token);
+                                        showNotification('Signed in successfully!', 'success');
+                                        checkAuthStatus();
+                                    }
+                                });
+                            }
+                        });
+                        authSubmitBtn.disabled = false;
+                        authSubmitBtn.textContent = 'Sign In';
                     } else {
                         // Try localStorage fallback
                         var result = DATA_MANAGER.login(email, password);
@@ -1109,7 +1107,7 @@
                 });
                 
             // ============================================================
-            // RESET PASSWORD - FIXED: No auto-fill
+            // RESET PASSWORD
             // ============================================================
             } else if (currentMode === 'reset') {
                 authSubmitBtn.disabled = true;
@@ -1163,7 +1161,7 @@
                 });
                 
             // ============================================================
-            // SIGN UP - FIXED: No auto-fill after verification
+            // SIGN UP
             // ============================================================
             } else if (currentMode === 'signup') {
                 var confirmPassword = $('authConfirmPassword') ? $('authConfirmPassword').value : '';
@@ -1198,7 +1196,6 @@
                                         showNotification('Email verified! Please sign in.', 'success');
                                         setTimeout(function() {
                                             openModal('login');
-                                            // DO NOT pre-fill email
                                         }, 500);
                                     }
                                 });
@@ -1218,7 +1215,6 @@
                             setTimeout(function() {
                                 if (authModal) authModal.style.display = 'none';
                                 openModal('login');
-                                // DO NOT pre-fill email
                             }, 1500);
                         } else {
                             showNotification(response.message || 'Error creating account. Please try again.', 'error');
@@ -1235,7 +1231,6 @@
                         setTimeout(function() {
                             if (authModal) authModal.style.display = 'none';
                             openModal('login');
-                            // DO NOT pre-fill email
                         }, 1500);
                     } else {
                         showNotification(errorMsg || 'Error creating account. Please try again.', 'error');
@@ -1451,7 +1446,7 @@
     }
 
     // ============================================================
-    // ACCOUNT SETTINGS - COMPLETE FIXED
+    // ACCOUNT SETTINGS
     // ============================================================
     function openAccountSettings() {
         var user = currentUser || DATA_MANAGER.getCurrentUser();
