@@ -546,7 +546,7 @@
     }
 
     // ============================================================
-// VERIFICATION MODAL - FIXED with refresh on cancel for signup
+// VERIFICATION MODAL - FIXED: Proper token handling for signin
 // ============================================================
 function openVerificationModal(email, action, callback) {
     pendingEmail = email;
@@ -607,7 +607,6 @@ function openVerificationModal(email, action, callback) {
         modal.remove();
         isVerifying = false;
         verificationDone = false;
-        // If user cancels signup verification, refresh the page
         if (action === 'signup') {
             window.location.reload();
         }
@@ -641,29 +640,57 @@ function openVerificationModal(email, action, callback) {
                 
                 pendingVerificationCode = code;
                 
-                if (result.token && action !== 'signup') {
+                // Handle token for signin
+                if (result.token && action === 'signin') {
                     API_MANAGER.setToken(result.token);
+                    showNotification('Signed in successfully!', 'success');
+                    checkAuthStatus();
+                    setTimeout(function() {
+                        modal.remove();
+                        if (typeof pendingCallback === 'function') {
+                            pendingCallback(result, code);
+                        }
+                        isVerifying = false;
+                        verificationDone = false;
+                    }, 500);
+                    return;
                 }
                 
+                // Handle signup - requires sign in
+                if (action === 'signup') {
+                    setTimeout(function() {
+                        modal.remove();
+                        if (typeof pendingCallback === 'function') {
+                            pendingCallback(result, code);
+                        }
+                        showNotification('Email verified! Please sign in.', 'success');
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 500);
+                        isVerifying = false;
+                        verificationDone = false;
+                    }, 800);
+                    return;
+                }
+                
+                // Handle other actions
                 setTimeout(function() {
                     modal.remove();
                     if (typeof pendingCallback === 'function') {
                         pendingCallback(result, code);
                     }
-                    if (action === 'signup') {
-                        showNotification('Email verified! Please sign in.', 'success');
-                        setTimeout(function() {
-                            window.location.reload();
-                        }, 500);
-                    } else if (action === 'signin') {
-                        checkAuthStatus();
-                    } else if (action === 'email') {
+                    if (action === 'email') {
                         showNotification('Email updated successfully!', 'success');
                         setTimeout(function() {
                             window.location.reload();
                         }, 500);
                     } else if (action === 'password') {
                         showNotification('Password updated successfully!', 'success');
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 500);
+                    } else if (action === 'delete') {
+                        showNotification('Account deleted.', 'info');
                         setTimeout(function() {
                             window.location.reload();
                         }, 500);
@@ -684,8 +711,8 @@ function openVerificationModal(email, action, callback) {
                 codeInput.value = '';
                 codeInput.focus();
             }
-        }).catch(function() {
-            showNotification('Verification error.', 'error');
+        }).catch(function(error) {
+            showNotification('Verification error. Please try again.', 'error');
             submitBtn.disabled = false;
             submitBtn.textContent = 'Verify';
             submitBtn.style.backgroundColor = '';
@@ -711,7 +738,6 @@ function openVerificationModal(email, action, callback) {
         });
     });
     
-    // When clicking outside the modal (backdrop), also refresh for signup
     modal.addEventListener('click', function(e) {
         if (e.target === modal) {
             modal.remove();
@@ -1009,7 +1035,7 @@ function openVerificationModal(email, action, callback) {
             var password = $('authPassword') ? $('authPassword').value.trim() : '';
             
             // ============================================================
-            // SIGN IN
+            // SIGN IN - FIXED: Proper token handling
             // ============================================================
             if (currentMode === 'login') {
                 authSubmitBtn.disabled = true;
@@ -1038,22 +1064,35 @@ function openVerificationModal(email, action, callback) {
                             authSubmitBtn.textContent = 'Sign In';
                         }
                     } else {
+                        // Check if requires verification
                         if (response.requiresVerification) {
                             showNotification('Please verify your identity. Code sent!', 'warning');
                             if (authModal) authModal.style.display = 'none';
+                            
+                            // Send verification code
                             sendVerificationCode(email, 'signin').then(function(codeResult) {
                                 if (codeResult.success) {
-                                    openVerificationModal(email, 'signin', function(result, code) {
-                                        if (result.success && result.token) {
-                                            API_MANAGER.setToken(result.token);
+                                    // Open verification modal - this will handle token generation
+                                    openVerificationModal(email, 'signin', function(verifyResult, code) {
+                                        if (verifyResult.success && verifyResult.token) {
+                                            // Token is already set in openVerificationModal for signin
                                             showNotification('Signed in successfully!', 'success');
                                             checkAuthStatus();
+                                        } else if (verifyResult.success) {
+                                            // Fallback: try to get token
+                                            API_MANAGER.setToken(verifyResult.token);
+                                            showNotification('Signed in successfully!', 'success');
+                                            checkAuthStatus();
+                                        } else {
+                                            showNotification('Verification failed. Please try again.', 'error');
                                         }
                                     });
+                                } else {
+                                    showNotification('Error sending verification code. Please try again.', 'error');
+                                    authSubmitBtn.disabled = false;
+                                    authSubmitBtn.textContent = 'Sign In';
                                 }
                             });
-                            authSubmitBtn.disabled = false;
-                            authSubmitBtn.textContent = 'Sign In';
                             return;
                         }
                         
@@ -1085,9 +1124,9 @@ function openVerificationModal(email, action, callback) {
                         if (authModal) authModal.style.display = 'none';
                         sendVerificationCode(email, 'signin').then(function(codeResult) {
                             if (codeResult.success) {
-                                openVerificationModal(email, 'signin', function(result, code) {
-                                    if (result.success && result.token) {
-                                        API_MANAGER.setToken(result.token);
+                                openVerificationModal(email, 'signin', function(verifyResult, code) {
+                                    if (verifyResult.success && verifyResult.token) {
+                                        API_MANAGER.setToken(verifyResult.token);
                                         showNotification('Signed in successfully!', 'success');
                                         checkAuthStatus();
                                     }
@@ -1101,6 +1140,7 @@ function openVerificationModal(email, action, callback) {
                         authSubmitBtn.disabled = false;
                         authSubmitBtn.textContent = 'Sign In';
                     } else {
+                        // Fallback to local storage
                         var result = DATA_MANAGER.login(email, password);
                         if (result.success) {
                             sendVerificationCode(email, 'signin').then(function(codeResult) {
@@ -1111,9 +1151,11 @@ function openVerificationModal(email, action, callback) {
                                     return;
                                 }
                                 if (authModal) authModal.style.display = 'none';
-                                openVerificationModal(email, 'signin', function(result, code) {
-                                    showNotification('Signed in!', 'success');
-                                    checkAuthStatus();
+                                openVerificationModal(email, 'signin', function(verifyResult, code) {
+                                    if (verifyResult.success) {
+                                        showNotification('Signed in!', 'success');
+                                        checkAuthStatus();
+                                    }
                                     authSubmitBtn.disabled = false;
                                     authSubmitBtn.textContent = 'Sign In';
                                 });
@@ -1135,6 +1177,7 @@ function openVerificationModal(email, action, callback) {
                         }
                     }
                 });
+            }
                 
             // ============================================================
             // RESET PASSWORD - FIXED: Properly handles verification code
