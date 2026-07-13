@@ -546,7 +546,7 @@
     }
 
     // ============================================================
-    // VERIFICATION MODAL
+    // VERIFICATION MODAL - FIXED
     // ============================================================
     function openVerificationModal(email, action, callback) {
         pendingEmail = email;
@@ -664,7 +664,7 @@
                                 window.location.reload();
                             }, 500);
                         } else if (action === 'reset') {
-                            // Reset handled in callback
+                            // Reset is handled in the callback - DO NOT reload here
                         } else {
                             checkAuthStatus();
                         }
@@ -1121,7 +1121,7 @@
                 });
                 
             // ============================================================
-            // RESET PASSWORD
+            // RESET PASSWORD - FIXED: Properly handles verification code
             // ============================================================
             } else if (currentMode === 'reset') {
                 authSubmitBtn.disabled = true;
@@ -1140,21 +1140,75 @@
                         if (result.success) {
                             if (authModal) authModal.style.display = 'none';
                             showNotification('Verification code sent! Check your email.', 'success');
-                            openVerificationModal(email, 'reset', function(result, code) {
-                                showPasswordResetModal().then(function(newPassword) {
-                                    if (newPassword === null) {
-                                        showNotification('Cancelled.', 'info');
-                                        authSubmitBtn.disabled = false;
-                                        authSubmitBtn.textContent = 'Send Reset Code';
-                                        return;
-                                    }
-                                    showNotification('Password reset successfully! Please sign in.', 'success');
+                            
+                            openVerificationModal(email, 'reset', function(verifyResult, code) {
+                                if (verifyResult.success) {
+                                    showPasswordResetModal().then(function(newPassword) {
+                                        if (newPassword === null) {
+                                            showNotification('Password reset cancelled.', 'info');
+                                            authSubmitBtn.disabled = false;
+                                            authSubmitBtn.textContent = 'Send Reset Code';
+                                            return;
+                                        }
+                                        
+                                        authSubmitBtn.textContent = 'Resetting password...';
+                                        
+                                        API_MANAGER.resetPassword(email, newPassword, code).then(function(resetResponse) {
+                                            if (resetResponse.success) {
+                                                showNotification('Password reset successfully! Please sign in with your new password.', 'success');
+                                                authSubmitBtn.disabled = false;
+                                                authSubmitBtn.textContent = 'Send Reset Code';
+                                                setTimeout(function() {
+                                                    window.location.reload();
+                                                }, 500);
+                                            } else {
+                                                showNotification(resetResponse.message || 'Failed to reset password. Please try again.', 'error');
+                                                authSubmitBtn.disabled = false;
+                                                authSubmitBtn.textContent = 'Send Reset Code';
+                                            }
+                                        }).catch(function(error) {
+                                            if (error.data && error.data.message && error.data.message.toLowerCase().includes('different from your current')) {
+                                                showNotification('New password must be different from your current password.', 'error');
+                                            } else {
+                                                showNotification(error.message || 'Failed to reset password. Please try again.', 'error');
+                                            }
+                                            authSubmitBtn.disabled = false;
+                                            authSubmitBtn.textContent = 'Send Reset Code';
+                                            setTimeout(function() {
+                                                showPasswordResetModal().then(function(retryPassword) {
+                                                    if (retryPassword !== null) {
+                                                        API_MANAGER.resetPassword(email, retryPassword, code).then(function(retryResponse) {
+                                                            if (retryResponse.success) {
+                                                                showNotification('Password reset successfully! Please sign in with your new password.', 'success');
+                                                                authSubmitBtn.disabled = false;
+                                                                authSubmitBtn.textContent = 'Send Reset Code';
+                                                                setTimeout(function() {
+                                                                    window.location.reload();
+                                                                }, 500);
+                                                            } else {
+                                                                showNotification(retryResponse.message || 'Failed to reset password. Please try again.', 'error');
+                                                                authSubmitBtn.disabled = false;
+                                                                authSubmitBtn.textContent = 'Send Reset Code';
+                                                            }
+                                                        }).catch(function(retryError) {
+                                                            showNotification(retryError.message || 'Failed to reset password. Please try again.', 'error');
+                                                            authSubmitBtn.disabled = false;
+                                                            authSubmitBtn.textContent = 'Send Reset Code';
+                                                        });
+                                                    } else {
+                                                        showNotification('Password reset cancelled.', 'info');
+                                                        authSubmitBtn.disabled = false;
+                                                        authSubmitBtn.textContent = 'Send Reset Code';
+                                                    }
+                                                });
+                                            }, 1000);
+                                        });
+                                    });
+                                } else {
+                                    showNotification('Verification failed. Please try again.', 'error');
                                     authSubmitBtn.disabled = false;
                                     authSubmitBtn.textContent = 'Send Reset Code';
-                                    setTimeout(function() {
-                                        window.location.reload();
-                                    }, 500);
-                                });
+                                }
                             });
                         } else {
                             showNotification(result.message || 'Error sending reset code. Please try again.', 'error');
@@ -1541,7 +1595,6 @@
                 saveBtn.disabled = true;
                 saveBtn.textContent = 'Verifying password...';
                 
-                // STEP 1: Verify current password using dedicated endpoint
                 API_MANAGER.verifyPassword(currentPassword).then(function(verifyResult) {
                     if (!verifyResult.success) {
                         showNotification('Current password is incorrect.', 'error');
@@ -1550,7 +1603,6 @@
                         return;
                     }
                     
-                    // STEP 2: Check if new email already exists
                     saveBtn.textContent = 'Checking email...';
                     API_MANAGER.checkEmailExists(newEmail).then(function(checkResult) {
                         if (checkResult.success) {
@@ -1560,7 +1612,6 @@
                             return;
                         }
                         
-                        // STEP 3: Send verification code
                         saveBtn.textContent = 'Sending verification code...';
                         sendVerificationCode(newEmail, 'email').then(function(result) {
                             if (!result.success) {
@@ -1570,10 +1621,8 @@
                                 return;
                             }
                             
-                            // STEP 4: Open verification modal
                             openVerificationModal(newEmail, 'email', function(verifyResult, code) {
                                 if (verifyResult.success) {
-                                    // STEP 5: Update email
                                     saveBtn.textContent = 'Updating email...';
                                     API_MANAGER.changeEmail(newEmail, currentPassword, code).then(function(response) {
                                         if (response.success) {
@@ -1611,7 +1660,6 @@
                         });
                     }).catch(function(error) {
                         if (error.status === 404) {
-                            // Email not found - this is good for new email
                             saveBtn.textContent = 'Sending verification code...';
                             sendVerificationCode(newEmail, 'email').then(function(result) {
                                 if (!result.success) {
@@ -1697,7 +1745,6 @@
                 saveBtn.disabled = true;
                 saveBtn.textContent = 'Verifying current password...';
                 
-                // STEP 1: Verify current password using dedicated endpoint
                 API_MANAGER.verifyPassword(currentPassword).then(function(verifyResult) {
                     if (!verifyResult.success) {
                         showNotification('Current password is incorrect.', 'error');
@@ -1706,7 +1753,6 @@
                         return;
                     }
                     
-                    // STEP 2: Send verification code
                     saveBtn.textContent = 'Sending verification code...';
                     sendVerificationCode(user.email, 'password').then(function(result) {
                         if (!result.success) {
@@ -1716,10 +1762,8 @@
                             return;
                         }
                         
-                        // STEP 3: Open verification modal
                         openVerificationModal(user.email, 'password', function(verifyResult, code) {
                             if (verifyResult.success) {
-                                // STEP 4: Update password
                                 saveBtn.textContent = 'Updating password...';
                                 API_MANAGER.changePassword(currentPassword, newPassword, code).then(function(response) {
                                     if (response.success) {
@@ -1788,7 +1832,6 @@
                     deleteBtn.disabled = true;
                     deleteBtn.textContent = 'Verifying password...';
                     
-                    // STEP 1: Verify password using dedicated endpoint
                     API_MANAGER.verifyPassword(password).then(function(verifyResult) {
                         if (!verifyResult.success) {
                             showNotification('Password is incorrect.', 'error');
@@ -1797,7 +1840,6 @@
                             return;
                         }
                         
-                        // STEP 2: Send verification code
                         deleteBtn.textContent = 'Sending verification code...';
                         sendVerificationCode(user.email, 'delete').then(function(result) {
                             if (!result.success) {
@@ -1807,11 +1849,9 @@
                                 return;
                             }
                             
-                            // STEP 3: Open verification modal
                             deleteBtn.textContent = 'Verifying...';
                             openVerificationModal(user.email, 'delete', function(verifyResult, code) {
                                 if (verifyResult.success) {
-                                    // STEP 4: Delete account
                                     deleteBtn.textContent = 'Deleting account...';
                                     API_MANAGER.deleteAccount(password, code).then(function(response) {
                                         if (response.success) {
