@@ -83,7 +83,6 @@ var API_MANAGER = {
         }).then(this.handleResponse);
     },
     
-    // NEW: Verify password endpoint
     verifyPassword: function(password) {
         var token = this.getToken();
         if (!token) {
@@ -98,7 +97,6 @@ var API_MANAGER = {
         }).then(this.handleResponse);
     },
     
-    // NEW: Reset password endpoint
     resetPassword: function(email, newPassword, verificationCode) {
         return fetch(this.API_URL + '/auth/reset-password', {
             method: 'POST',
@@ -151,7 +149,7 @@ var API_MANAGER = {
     },
     
     // ============================================================
-    // USER APIs - ALL WITH VERIFICATION CODE
+    // USER APIs
     // ============================================================
     
     updateProfile: function(updates) {
@@ -259,7 +257,7 @@ var API_MANAGER = {
     },
     
     // ============================================================
-    // VERIFICATION APIs - FIXED: Better cross-device support
+    // VERIFICATION APIs
     // ============================================================
     
     sendVerificationCode: function(email, action) {
@@ -290,7 +288,7 @@ var API_MANAGER = {
     },
     
     // ============================================================
-    // SYNC HELPERS - FIXED: Better caching
+    // SYNC HELPERS
     // ============================================================
     
     syncUserData: function() {
