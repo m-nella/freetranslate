@@ -114,33 +114,30 @@ var API_MANAGER = {
         }).then(this.handleResponse);
     },
     
-    changePassword: function(currentPassword, newPassword, verificationCode) {
-        var body = { currentPassword: currentPassword, newPassword: newPassword };
-        if (verificationCode) { body.verificationCode = verificationCode; }
+    changePassword: function(currentPassword, newPassword) {
+        // IMPORTANT: NO verificationCode parameter - code is already verified
         return fetch(this.API_URL + '/user/change-password', {
             method: 'PUT',
             headers: this.getHeaders(),
-            body: JSON.stringify(body)
+            body: JSON.stringify({ currentPassword: currentPassword, newPassword: newPassword })
         }).then(this.handleResponse);
     },
     
-    changeEmail: function(newEmail, password, verificationCode) {
-        var body = { newEmail: newEmail, password: password };
-        if (verificationCode) { body.verificationCode = verificationCode; }
+    changeEmail: function(newEmail, password) {
+        // IMPORTANT: NO verificationCode parameter - code is already verified
         return fetch(this.API_URL + '/user/change-email', {
             method: 'PUT',
             headers: this.getHeaders(),
-            body: JSON.stringify(body)
+            body: JSON.stringify({ newEmail: newEmail, password: password })
         }).then(this.handleResponse);
     },
     
-    deleteAccount: function(password, verificationCode) {
-        var body = { password: password };
-        if (verificationCode) { body.verificationCode = verificationCode; }
+    deleteAccount: function(password) {
+        // IMPORTANT: NO verificationCode parameter - code is already verified
         return fetch(this.API_URL + '/user/delete', {
             method: 'DELETE',
             headers: this.getHeaders(),
-            body: JSON.stringify(body)
+            body: JSON.stringify({ password: password })
         }).then(this.handleResponse);
     },
     
