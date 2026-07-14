@@ -46,6 +46,7 @@ var API_MANAGER = {
         return fetch(this.API_URL + '/auth/signup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ email: email, password: password, username: username })
         }).then(this.handleResponse);
     },
@@ -54,6 +55,7 @@ var API_MANAGER = {
         return fetch(this.API_URL + '/auth/signin', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ email: email, password: password })
         }).then(this.handleResponse);
     },
@@ -62,6 +64,7 @@ var API_MANAGER = {
         return fetch(this.API_URL + '/auth/verify-password', {
             method: 'POST',
             headers: this.getHeaders(),
+            credentials: 'include',
             body: JSON.stringify({ password: password })
         }).then(this.handleResponse);
     },
@@ -70,6 +73,7 @@ var API_MANAGER = {
         return fetch(this.API_URL + '/auth/reset-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ email: email, newPassword: newPassword, verificationCode: verificationCode })
         }).then(this.handleResponse);
     },
@@ -81,7 +85,8 @@ var API_MANAGER = {
         }
         return fetch(this.API_URL + '/auth/logout', {
             method: 'POST',
-            headers: this.getHeaders()
+            headers: this.getHeaders(),
+            credentials: 'include'
         }).then(this.handleResponse).catch(function() {
             return { success: true };
         });
@@ -94,7 +99,8 @@ var API_MANAGER = {
         }
         return fetch(this.API_URL + '/auth/me', {
             method: 'GET',
-            headers: this.getHeaders()
+            headers: this.getHeaders(),
+            credentials: 'include'
         }).then(this.handleResponse);
     },
     
@@ -102,6 +108,7 @@ var API_MANAGER = {
         return fetch(this.API_URL + '/auth/check-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ email: email })
         }).then(this.handleResponse);
     },
@@ -110,6 +117,7 @@ var API_MANAGER = {
         return fetch(this.API_URL + '/user/profile', {
             method: 'PUT',
             headers: this.getHeaders(),
+            credentials: 'include',
             body: JSON.stringify(updates)
         }).then(this.handleResponse);
     },
@@ -118,6 +126,7 @@ var API_MANAGER = {
         return fetch(this.API_URL + '/user/change-password', {
             method: 'PUT',
             headers: this.getHeaders(),
+            credentials: 'include',
             body: JSON.stringify({ currentPassword: currentPassword, newPassword: newPassword })
         }).then(this.handleResponse);
     },
@@ -126,6 +135,7 @@ var API_MANAGER = {
         return fetch(this.API_URL + '/user/change-email', {
             method: 'PUT',
             headers: this.getHeaders(),
+            credentials: 'include',
             body: JSON.stringify({ newEmail: newEmail, password: password })
         }).then(this.handleResponse);
     },
@@ -134,6 +144,7 @@ var API_MANAGER = {
         return fetch(this.API_URL + '/user/delete', {
             method: 'DELETE',
             headers: this.getHeaders(),
+            credentials: 'include',
             body: JSON.stringify({ password: password })
         }).then(this.handleResponse);
     },
@@ -141,7 +152,8 @@ var API_MANAGER = {
     getHistory: function() {
         return fetch(this.API_URL + '/history', {
             method: 'GET',
-            headers: this.getHeaders()
+            headers: this.getHeaders(),
+            credentials: 'include'
         }).then(this.handleResponse);
     },
     
@@ -149,6 +161,7 @@ var API_MANAGER = {
         return fetch(this.API_URL + '/history', {
             method: 'POST',
             headers: this.getHeaders(),
+            credentials: 'include',
             body: JSON.stringify(entry)
         }).then(this.handleResponse);
     },
@@ -156,21 +169,24 @@ var API_MANAGER = {
     deleteHistoryItem: function(id) {
         return fetch(this.API_URL + '/history/' + id, {
             method: 'DELETE',
-            headers: this.getHeaders()
+            headers: this.getHeaders(),
+            credentials: 'include'
         }).then(this.handleResponse);
     },
     
     clearHistory: function() {
         return fetch(this.API_URL + '/history/clear', {
             method: 'DELETE',
-            headers: this.getHeaders()
+            headers: this.getHeaders(),
+            credentials: 'include'
         }).then(this.handleResponse);
     },
     
     getSettings: function() {
         return fetch(this.API_URL + '/settings', {
             method: 'GET',
-            headers: this.getHeaders()
+            headers: this.getHeaders(),
+            credentials: 'include'
         }).then(this.handleResponse);
     },
     
@@ -178,6 +194,7 @@ var API_MANAGER = {
         return fetch(this.API_URL + '/settings', {
             method: 'PUT',
             headers: this.getHeaders(),
+            credentials: 'include',
             body: JSON.stringify(settings)
         }).then(this.handleResponse);
     },
@@ -186,6 +203,7 @@ var API_MANAGER = {
         return fetch(this.API_URL + '/verify/send-code', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ email: email, action: action })
         }).then(this.handleResponse);
     },
@@ -194,6 +212,7 @@ var API_MANAGER = {
         return fetch(this.API_URL + '/verify/check-code', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ email: email, code: code, action: action })
         }).then(this.handleResponse);
     },
