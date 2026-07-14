@@ -7,15 +7,46 @@ var API_MANAGER = {
     API_URL: 'https://freetranslatelanguage-backend.onrender.com/api',
     
     getToken: function() {
+        // Try to get token from cookie first
+        var token = this.getCookie('authToken');
+        if (token) {
+            localStorage.setItem('authToken', token);
+            return token;
+        }
         return localStorage.getItem('authToken');
     },
     
     setToken: function(token) {
         if (token) {
             localStorage.setItem('authToken', token);
+            this.setCookie('authToken', token, 30);
         } else {
             localStorage.removeItem('authToken');
+            this.deleteCookie('authToken');
         }
+    },
+    
+    getCookie: function(name) {
+        var value = '; ' + document.cookie;
+        var parts = value.split('; ' + name + '=');
+        if (parts.length === 2) {
+            return parts.pop().split(';').shift();
+        }
+        return null;
+    },
+    
+    setCookie: function(name, value, days) {
+        var expires = '';
+        if (days) {
+            var date = new Date();
+            date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+            expires = '; expires=' + date.toUTCString();
+        }
+        document.cookie = name + '=' + (value || '') + expires + '; path=/; SameSite=Lax';
+    },
+    
+    deleteCookie: function(name) {
+        document.cookie = name + '=; Max-Age=-99999999; path=/';
     },
     
     getHeaders: function() {
