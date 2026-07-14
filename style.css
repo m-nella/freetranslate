@@ -1494,23 +1494,23 @@ body {
        History & About buttons - Show icon + text with spacing
        ============================================================ */
     .auth-btn,
-    .nav-btn {
-        padding: 4px 10px;
-        font-size: 0.7rem;
-        min-height: 32px;
-        gap: 12px;
-        border-radius: 6px;
-    }
-    .auth-btn i,
-    .nav-btn i {
-        font-size: 0.85rem;
-    }
-    .auth-btn span,
-    .nav-btn span {
-        font-size: 0.7rem !important;
-        display: inline !important;
-    }
-
+.nav-btn {
+    padding: 4px 12px !important;  /* ← INCREASED padding */
+    font-size: 0.7rem;
+    min-height: 32px;
+    gap: 12px !important;          /* ← INCREASED gap with !important */
+    border-radius: 6px;
+}
+.auth-btn i,
+.nav-btn i {
+    font-size: 0.85rem;
+}
+.auth-btn span,
+.nav-btn span {
+    font-size: 0.7rem !important;
+    display: inline !important;
+    margin-left: 2px;             /* ← ADD extra space after icon */
+}
     /* ============================================================
        PROFILE BUTTON - ICON ONLY on mobile
        ============================================================ */
@@ -1730,23 +1730,24 @@ body {
        History & About buttons - Show icon + text with spacing
        ============================================================ */
     .auth-btn,
-    .nav-btn {
-        padding: 3px 8px !important;
-        min-width: auto !important;
-        min-height: 28px !important;
-        gap: 10px !important;
-        border-radius: 4px !important;
-        font-size: 0.65rem !important;
-    }
-    .auth-btn i,
-    .nav-btn i {
-        font-size: 0.75rem !important;
-    }
-    .auth-btn span,
-    .nav-btn span {
-        font-size: 0.6rem !important;
-        display: inline !important;
-    }
+.nav-btn {
+    padding: 3px 10px !important;  /* ← INCREASED padding */
+    min-width: auto !important;
+    min-height: 28px !important;
+    gap: 10px !important;          /* ← INCREASED gap */
+    border-radius: 4px !important;
+    font-size: 0.65rem !important;
+}
+.auth-btn i,
+.nav-btn i {
+    font-size: 0.75rem !important;
+}
+.auth-btn span,
+.nav-btn span {
+    font-size: 0.6rem !important;
+    display: inline !important;
+    margin-left: 2px;             /* ← ADD extra space after icon */
+}
 
     /* ============================================================
        PROFILE BUTTON - ICON ONLY on very small phones
