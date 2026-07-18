@@ -48,7 +48,7 @@
     var initialAuthCheckDone = false;
     var translationInProgress = false;
     var isMicClick = false;
-    var signupData = null; // Store signup data until verification
+    var signupData = null;
 
     // ============================================================
     // LANGUAGE LIST
@@ -550,7 +550,7 @@
     }
 
     // ============================================================
-    // VERIFICATION MODAL - FIXED: Account only created AFTER verification
+    // VERIFICATION MODAL - FIXED: Account ONLY created after verification
     // ============================================================
     function openVerificationModal(email, action, callback) {
         pendingEmail = email;
@@ -611,7 +611,6 @@
             modal.remove();
             isVerifying = false;
             verificationDone = false;
-            // For signup, cancel = don't create account
             if (action === 'signup') {
                 signupData = null;
                 showNotification('Account creation cancelled.', 'info');
@@ -655,25 +654,56 @@
                     pendingVerificationCode = code;
                     
                     // ============================================================
-                    // SIGNUP: Account is ONLY created NOW after verification
+                    // SIGNUP: Account is ONLY created NOW after verification succeeds
                     // ============================================================
                     if (action === 'signup') {
-                        // Account should already exist from signup handler
-                        // The signup handler creates the account and stores it
-                        setTimeout(function() {
-                            modal.remove();
-                            if (typeof pendingCallback === 'function') {
-                                pendingCallback(result, code);
-                            }
-                            showNotification('Account verified! Please sign in.', 'success');
-                            setTimeout(function() {
-                                // Clear signup data and redirect to sign in
-                                signupData = null;
-                                window.location.reload();
-                            }, 500);
+                        if (!signupData) {
+                            showNotification('Signup data missing. Please try again.', 'error');
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Verify';
+                            submitBtn.style.backgroundColor = '';
                             isVerifying = false;
-                            verificationDone = false;
-                        }, 800);
+                            return;
+                        }
+                        
+                        submitBtn.textContent = 'Creating account...';
+                        
+                        API_MANAGER.signup(signupData.email, signupData.password, signupData.username).then(function(signupResponse) {
+                            if (signupResponse.success) {
+                                submitBtn.textContent = '✓ Verified & Created';
+                                showNotification('Account created and verified successfully!', 'success');
+                                
+                                setTimeout(function() {
+                                    modal.remove();
+                                    if (typeof pendingCallback === 'function') {
+                                        pendingCallback(signupResponse, code);
+                                    }
+                                    showNotification('Account created! Please sign in.', 'success');
+                                    setTimeout(function() {
+                                        signupData = null;
+                                        window.location.reload();
+                                    }, 500);
+                                    isVerifying = false;
+                                    verificationDone = false;
+                                }, 800);
+                            } else {
+                                showNotification(signupResponse.message || 'Failed to create account. Please try again.', 'error');
+                                submitBtn.disabled = false;
+                                submitBtn.textContent = 'Verify';
+                                submitBtn.style.backgroundColor = '';
+                                isVerifying = false;
+                                codeInput.value = '';
+                                codeInput.focus();
+                            }
+                        }).catch(function(error) {
+                            showNotification(error.message || 'Failed to create account. Please try again.', 'error');
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Verify';
+                            submitBtn.style.backgroundColor = '';
+                            isVerifying = false;
+                            codeInput.value = '';
+                            codeInput.focus();
+                        });
                         return;
                     }
                     
@@ -689,7 +719,6 @@
                                 if (typeof pendingCallback === 'function') {
                                     pendingCallback(result, code);
                                 }
-                                // FIXED: Don't call fullSync, just check auth status
                                 checkAuthStatus();
                                 isVerifying = false;
                                 verificationDone = false;
@@ -774,7 +803,6 @@
                         verificationDone = false;
                     }, 800);
                 } else {
-                    // Show error but keep modal open
                     errorMessage.textContent = result.message || 'Invalid code. Please try again.';
                     errorMessage.style.display = 'block';
                     submitBtn.disabled = false;
@@ -841,7 +869,6 @@
             }
         });
         
-        // Enter key support
         codeInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 form.dispatchEvent(new Event('submit'));
@@ -893,7 +920,6 @@
             return;
         }
         
-        // FIXED: Use cached user data immediately for faster UI
         var cachedUser = localStorage.getItem('cachedUser');
         if (cachedUser) {
             try {
@@ -911,7 +937,6 @@
             } catch(e) {}
         }
         
-        // Then verify with server in background
         API_MANAGER.getMe().then(function(response) {
             authCheckInProgress = false;
             initialAuthCheckDone = true;
@@ -981,7 +1006,6 @@
                 return;
             }
             
-            // Keep cached user data if server check fails
             if (!cachedUser) {
                 API_MANAGER.setToken(null);
                 localStorage.removeItem('cachedUser');
@@ -1156,8 +1180,6 @@
                     if (response.success) {
                         if (response.token) {
                             API_MANAGER.setToken(response.token);
-                            // FIXED: Don't call fullSync - it causes delays
-                            // Just set user and update UI
                             if (response.user) {
                                 currentUser = response.user;
                                 isLoggedIn = true;
@@ -1168,7 +1190,6 @@
                             authSubmitBtn.disabled = false;
                             authSubmitBtn.textContent = 'Sign In';
                             if (authModal) authModal.style.display = 'none';
-                            // FIXED: Use checkAuthStatus which is faster now
                             checkAuthStatus();
                         } else {
                             showNotification(response.message || 'Sign in failed.', 'error');
@@ -1385,7 +1406,7 @@
                 });
                 
             // ============================================================
-            // SIGN UP - FIXED: Account created before verification flow
+            // SIGN UP - FIXED: Account ONLY created AFTER verification
             // ============================================================
             } else if (currentMode === 'signup') {
                 var confirmPassword = $('authConfirmPassword') ? $('authConfirmPassword').value : '';
@@ -1406,31 +1427,68 @@
                 }
                 
                 authSubmitBtn.disabled = true;
-                authSubmitBtn.textContent = 'Creating account...';
+                authSubmitBtn.textContent = 'Sending verification code...';
                 
-                // Step 1: Create account in database
-                API_MANAGER.signup(email, password, username).then(function(response) {
-                    if (response.success) {
-                        // Store signup data for verification
-                        signupData = {
-                            email: email,
-                            password: password,
-                            username: username
-                        };
-                        
-                        authSubmitBtn.textContent = 'Sending verification code...';
-                        // Step 2: Send verification code
+                // STEP 1: Check if email already exists
+                API_MANAGER.checkEmailExists(email).then(function(checkResult) {
+                    if (checkResult.success) {
+                        showNotification('Email already registered. Please sign in.', 'error');
+                        authSubmitBtn.disabled = false;
+                        authSubmitBtn.textContent = 'Create Account';
+                        setTimeout(function() {
+                            if (authModal) authModal.style.display = 'none';
+                            openModal('login');
+                        }, 1500);
+                        return;
+                    }
+                    
+                    // STEP 2: Send verification code ONLY (don't create account yet)
+                    API_MANAGER.sendVerificationCode(email, 'signup').then(function(codeResult) {
+                        if (codeResult.success) {
+                            // Store signup data temporarily (NOT saved to DB yet)
+                            signupData = {
+                                email: email,
+                                password: password,
+                                username: username
+                            };
+                            
+                            if (authModal) authModal.style.display = 'none';
+                            showNotification('Verification code sent! Please check your email.', 'success');
+                            
+                            // STEP 3: Open verification modal - account created inside it
+                            openVerificationModal(email, 'signup', function(result, code) {
+                                if (result.success) {
+                                    showNotification('Email verified! Account created and activated.', 'success');
+                                    setTimeout(function() {
+                                        signupData = null;
+                                        window.location.reload();
+                                    }, 500);
+                                }
+                            });
+                        } else {
+                            showNotification('Failed to send verification code. Please try again.', 'error');
+                            authSubmitBtn.disabled = false;
+                            authSubmitBtn.textContent = 'Create Account';
+                        }
+                    });
+                }).catch(function(error) {
+                    if (error.status === 404) {
+                        // Email doesn't exist - continue with signup
                         API_MANAGER.sendVerificationCode(email, 'signup').then(function(codeResult) {
                             if (codeResult.success) {
-                                if (authModal) authModal.style.display = 'none';
-                                showNotification('Account created! Please verify your email.', 'success');
+                                signupData = {
+                                    email: email,
+                                    password: password,
+                                    username: username
+                                };
                                 
-                                // Step 3: Open verification modal
+                                if (authModal) authModal.style.display = 'none';
+                                showNotification('Verification code sent! Please check your email.', 'success');
+                                
                                 openVerificationModal(email, 'signup', function(result, code) {
                                     if (result.success) {
-                                        showNotification('Email verified! Account activated.', 'success');
+                                        showNotification('Email verified! Account created and activated.', 'success');
                                         setTimeout(function() {
-                                            // Clear signup data and redirect to sign in
                                             signupData = null;
                                             window.location.reload();
                                         }, 500);
@@ -1440,37 +1498,10 @@
                                 showNotification('Failed to send verification code. Please try again.', 'error');
                                 authSubmitBtn.disabled = false;
                                 authSubmitBtn.textContent = 'Create Account';
-                                // Rollback: Delete the account if verification fails
-                                // Note: Account exists but is not verified
                             }
                         });
                     } else {
-                        if (response.message && response.message.toLowerCase().includes('already registered')) {
-                            showNotification('Email already registered. Please sign in.', 'error');
-                            authSubmitBtn.disabled = false;
-                            authSubmitBtn.textContent = 'Create Account';
-                            setTimeout(function() {
-                                if (authModal) authModal.style.display = 'none';
-                                openModal('login');
-                            }, 1500);
-                        } else {
-                            showNotification(response.message || 'Error creating account. Please try again.', 'error');
-                            authSubmitBtn.disabled = false;
-                            authSubmitBtn.textContent = 'Create Account';
-                        }
-                    }
-                }).catch(function(error) {
-                    var errorMsg = error.message || '';
-                    if (errorMsg.toLowerCase().includes('already registered')) {
-                        showNotification('Email already registered. Please sign in.', 'error');
-                        authSubmitBtn.disabled = false;
-                        authSubmitBtn.textContent = 'Create Account';
-                        setTimeout(function() {
-                            if (authModal) authModal.style.display = 'none';
-                            openModal('login');
-                        }, 1500);
-                    } else {
-                        showNotification(errorMsg || 'Error creating account. Please try again.', 'error');
+                        showNotification('Error checking email. Please try again.', 'error');
                         authSubmitBtn.disabled = false;
                         authSubmitBtn.textContent = 'Create Account';
                     }
@@ -2384,9 +2415,6 @@
         translateFromBtn.textContent = 'Translate from: ';
         translateFromContainer.appendChild(translateFromBtn);
 
-        // ============================================================
-        // FIXED: Translate From button - Swaps languages properly
-        // ============================================================
         function handleTranslateFromClick(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -2479,9 +2507,6 @@
             });
         }
 
-        // ============================================================
-        // FIXED: updateTranslateFromBtn - Shows button correctly
-        // ============================================================
         function updateTranslateFromBtn(detectedLang, text) {
             if (!text || text.length < 2 || isRecording) {
                 translateFromContainer.style.display = 'none';
@@ -2523,9 +2548,6 @@
             translateFromBtn.textContent = 'Translate from: ';
         }
 
-        // ============================================================
-        // FIXED: detectLanguage - Uses Google Translate API
-        // ============================================================
         function detectLanguage(text) {
             return new Promise(function(resolve) {
                 if (!text || text.length < 3) {
@@ -2610,9 +2632,6 @@
             }
         }
 
-        // ============================================================
-        // FIXED: performTranslation - Proper language detection
-        // ============================================================
         function performTranslation() {
             var text = inputText ? inputText.value.trim() : '';
             if (!text) {
@@ -2706,7 +2725,6 @@
                 return;
             }
             
-            // FIXED: Detect language and show button
             detectLanguage(text).then(function(detectedLang) {
                 if (!isRecording && detectedLang && detectedLang !== 'auto') {
                     updateTranslateFromBtn(detectedLang, text);
@@ -3011,17 +3029,14 @@
                         }
                     }
                     
-                    // FIXED: Silence detection - reset timer on any speech
                     if (silenceTimeout) {
                         clearTimeout(silenceTimeout);
                         silenceTimeout = null;
                     }
                     
-                    // Start new silence timer
                     silenceTimeout = setTimeout(function() {
                         if (isRecording && lastSpeechTime) {
                             var timeSinceLastSpeech = Date.now() - lastSpeechTime;
-                            // FIXED: Auto-stop after 60 seconds of continuous silence
                             if (timeSinceLastSpeech >= 60000) {
                                 if (isRecording) {
                                     try {
@@ -3141,12 +3156,8 @@
             
             initRecognition();
             
-            // ============================================================
-            // FIXED: Mic button - Click to start/stop, stays on until clicked again
-            // ============================================================
             bindClick(micBtn, function() {
                 if (isRecording) {
-                    // Stop recording
                     isRecording = false;
                     isProcessingRecording = false;
                     if (silenceTimeout) {
@@ -3183,7 +3194,6 @@
                     lastSpeechTime = null;
                     translationInProgress = false;
                 } else {
-                    // Start recording
                     var lang = sourceLang ? sourceLang.value || 'en' : 'en';
                     var langName = getLanguageName(lang);
                     currentRecordingLang = lang;
